@@ -3,13 +3,13 @@ import math
 import random
 import pygame
 from config import *
+from pathfinding import get_astar_path
 
 def draw_hp_bar(surface, x, y, hp, max_hp, width=30):
     if hp < max_hp or hp <= 0:
-        bar_w, bar_h = width, 4
-        bx, by = x - bar_w // 2, y - 20
-        pygame.draw.rect(surface, RED, (bx, by, bar_w, bar_h))
-        pygame.draw.rect(surface, GREEN, (bx, by, int(bar_w * (max(0, hp) / max_hp)), bar_h))
+        bx, by = x - width // 2, y - 20
+        pygame.draw.rect(surface, RED, (bx, by, width, 4))
+        pygame.draw.rect(surface, GREEN, (bx, by, int(width * (max(0, hp) / max_hp)), 4))
 
 class Tree:
     def __init__(self, x, y):
@@ -34,41 +34,32 @@ class Crystal:
         if self.hp < self.max_hp: draw_hp_bar(surface, int(self.x - cam_x), int(self.y - cam_y), self.hp, self.max_hp)
 
 class Building:
-    def __init__(self, x, y, b_type, rotation=0):
-        self.x, self.y, self.b_type, self.rotation = x, y, b_type, rotation
+    def __init__(self, col, row, b_type):
+        self.col, self.row, self.b_type = int(col), int(row), b_type
         self.is_selected, self.is_built, self.build_progress = False, False, 0
-        self.hp, self.max_hp = 1, 100
-        self.vision_range = 150
-        self.recruit_queue, self.recruit_progress, self.recruit_time_max = 0, 0, 180
-        self.attack_timer = 0
-        self.rally_x, self.rally_y = x + 80, y + 80
         
-        if b_type == 'house':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Domek", 25, ORANGE, 200, 500
-            self.rect = pygame.Rect(x - 25, y - 25, 50, 50)
-        elif b_type == 'barracks':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Baraki", 35, PURPLE, 400, 600
-            self.rect = pygame.Rect(x - 35, y - 35, 70, 70)
-            self.recruit_time_max = 240 
-        elif b_type == 'tower':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Wieżyczka", 20, LIGHT_GRAY, 300, 300
-            self.rect = pygame.Rect(x - 20, y - 20, 40, 40)
-            self.vision_range = 300
-            self.damage = 15
-        elif b_type == 'base':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Baza", 45, RED, 1500, 800
-            self.rect = pygame.Rect(x - 45, y - 45, 90, 90)
-            self.vision_range = 400
-        elif b_type == 'wall':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Mur", 15, LIGHT_GRAY, 500, 150
-            w, h = (60, 20) if rotation == 0 else (20, 60)
-            self.rect = pygame.Rect(x - w//2, y - h//2, w, h)
-        elif b_type == 'cemetery':
-            self.title, self.radius, self.color, self.max_hp, self.build_max = "Cmentarz", 35, (50, 20, 50), 800, 100
-            self.rect = pygame.Rect(x - 35, y - 35, 70, 70)
-            self.is_built = True
-            self.hp = self.max_hp
-            self.spawn_timer = 0
+        st = BUILDING_STATS[b_type]
+        self.title = st['title']
+        self.color = st['color']
+        self.max_hp = st['hp']
+        self.hp = 1
+        self.build_max = st['build_time']
+        self.w_tiles = st['w_tiles']
+        self.h_tiles = st['h_tiles']
+        
+        # Geometria Grid-Snap [Źródło: Reprezentacja BoxCollider2D]
+        self.rect = pygame.Rect(self.col * TILE_SIZE, self.row * TILE_SIZE, self.w_tiles * TILE_SIZE, self.h_tiles * TILE_SIZE)
+        self.x, self.y = self.rect.centerx, self.rect.centery
+        self.radius = (max(self.rect.width, self.rect.height) // 2) + 5 # Promień używany przez AI dla odległości euklidesowych
+        
+        self.vision_range = 150 if b_type != 'base' else 400
+        self.recruit_queue, self.recruit_progress, self.recruit_time_max = 0, 0, (240 if b_type == 'barracks' else 180)
+        self.attack_timer = 0
+        self.rally_x, self.rally_y = self.x + 80, self.y + 80
+        self.spawn_timer = 0
+        
+        if b_type == 'tower': self.vision_range, self.damage = 300, 15
+        elif b_type == 'cemetery': self.is_built, self.hp = True, self.max_hp
 
     def update(self, enemies_list, effects_list, is_night=False):
         if not self.is_built:
@@ -96,45 +87,42 @@ class Building:
                             break
                             
             if self.b_type == 'cemetery':
-                self.spawn_timer += 1
-                threshold = 240 if is_night else 1200 
-                if self.spawn_timer >= threshold:
-                    self.spawn_timer = 0
-                    return 'spawn_zombie'
+                if is_night:
+                    self.spawn_timer += 1
+                    if self.spawn_timer >= 240:
+                        self.spawn_timer, self.hp = 0, min(self.max_hp, self.hp + 50) # Regeneracja cmentarza
+                        return 'spawn_zombie'
+                else: self.spawn_timer = 0
         return None
 
     def draw(self, surface, cam_x, cam_y):
-        hx, hy = int(self.x - cam_x), int(self.y - cam_y)
-        if self.b_type == 'wall':
-            draw_rect = self.rect.move(-cam_x, -cam_y)
-            pygame.draw.rect(surface, self.color if self.is_built else (150, 100, 0), draw_rect, 0 if self.is_built else 2)
-            if self.is_selected: pygame.draw.rect(surface, WHITE, draw_rect, 2)
+        draw_rect = self.rect.move(-cam_x, -cam_y)
+        
+        # Wszystkie budynki są teraz rysowane jako kwadraty/prostokąty na Gridzie
+        if not self.is_built:
+            pygame.draw.rect(surface, (150, 100, 0), draw_rect, 2)
+            pygame.draw.rect(surface, GREEN, (draw_rect.x, draw_rect.y - 15, int(draw_rect.width * (self.build_progress / self.build_max)), 6))
         else:
-            if not self.is_built:
-                pygame.draw.circle(surface, (150, 100, 0), (hx, hy), self.radius, 2)
-                pygame.draw.rect(surface, GREEN, (hx - 20, hy - 35, int(40 * (self.build_progress / self.build_max)), 6))
-            else:
-                if self.b_type == 'cemetery':
-                    pygame.draw.circle(surface, (20, 20, 20), (hx, hy), self.radius)
-                    pygame.draw.rect(surface, (80, 80, 80), (hx-10, hy-20, 20, 40)) 
-                else:
-                    pygame.draw.circle(surface, self.color, (hx, hy), self.radius)
+            pygame.draw.rect(surface, self.color, draw_rect)
+            if self.b_type == 'cemetery':
+                pygame.draw.rect(surface, (20, 20, 20), (draw_rect.centerx - 10, draw_rect.centery - 20, 20, 40)) 
+            
+            if self.b_type == 'tower' and self.is_selected:
+                s = pygame.Surface((self.vision_range*2, self.vision_range*2), pygame.SRCALPHA)
+                pygame.draw.circle(s, (255, 0, 0, 50), (self.vision_range, self.vision_range), self.vision_range)
+                surface.blit(s, (draw_rect.centerx - self.vision_range, draw_rect.centery - self.vision_range))
                 
-                if self.b_type == 'tower' and self.is_selected:
-                    s = pygame.Surface((self.vision_range*2, self.vision_range*2), pygame.SRCALPHA)
-                    pygame.draw.circle(s, (255, 0, 0, 50), (self.vision_range, self.vision_range), self.vision_range)
-                    surface.blit(s, (hx - self.vision_range, hy - self.vision_range))
-            if self.is_selected: pygame.draw.circle(surface, WHITE, (hx, hy), self.radius + 2, 1)
+        if self.is_selected: pygame.draw.rect(surface, WHITE, draw_rect, 2)
+        
+        if self.b_type in ['base', 'barracks'] and self.is_built and self.is_selected:
+            rx, ry = int(self.rally_x - cam_x), int(self.rally_y - cam_y)
+            pygame.draw.line(surface, WHITE, (draw_rect.centerx, draw_rect.centery), (rx, ry), 1)
+            pygame.draw.circle(surface, GREEN, (rx, ry), 5)
+            if self.recruit_queue > 0:
+                pygame.draw.rect(surface, DARK_GRAY, (draw_rect.centerx - 30, draw_rect.y - 25, 60, 8))
+                pygame.draw.rect(surface, GREEN, (draw_rect.centerx - 30, draw_rect.y - 25, int(60 * (self.recruit_progress / self.recruit_time_max)), 8))
             
-            if self.b_type in ['base', 'barracks'] and self.is_built and self.is_selected:
-                rx, ry = int(self.rally_x - cam_x), int(self.rally_y - cam_y)
-                pygame.draw.line(surface, WHITE, (hx, hy), (rx, ry), 1)
-                pygame.draw.circle(surface, GREEN, (rx, ry), 5)
-                if self.recruit_queue > 0:
-                    pygame.draw.rect(surface, DARK_GRAY, (hx - 30, hy - self.radius - 25, 60, 8))
-                    pygame.draw.rect(surface, GREEN, (hx - 30, hy - self.radius - 25, int(60 * (self.recruit_progress / self.recruit_time_max)), 8))
-            
-        draw_hp_bar(surface, hx, hy, self.hp, self.max_hp)
+        draw_hp_bar(surface, draw_rect.centerx, draw_rect.centery, self.hp, self.max_hp)
 
 class Unit:
     def __init__(self, x, y, u_type='worker'):
@@ -144,6 +132,11 @@ class Unit:
         self.carry_type, self.carry_amount, self.harvest_timer = None, 0, 0
         self.last_harvest_x, self.last_harvest_y, self.search_type = x, y, None
         
+        # System Pathfindingu
+        self.path = [] 
+        self.is_hidden = False # Wartość True sprawia, że robotnik znika przy budowie
+        self.building_ref = None # Referencja do obiektu w budowie
+        
         st = UNIT_STATS[u_type]
         self.title, self.speed, self.radius = st['title'], st['speed'], (12 if u_type == 'worker' else 10)
         self.hp = self.max_hp = st['hp']
@@ -152,18 +145,80 @@ class Unit:
         self.color = BLUE if u_type == 'worker' else (150, 200, 150)
         self.attack_timer = 0
 
-    def command_move(self, tx, ty): self.state, self.target_x, self.target_y, self.target_obj = 'MOVE', tx, ty, None
-    def command_harvest(self, resource_obj): self.state, self.target_obj = 'HARVEST', resource_obj
-    def command_attack(self, obj): self.state, self.target_obj = 'ATTACK', obj
-    def command_build(self, tx, ty, b_type, rot): self.state, self.target_x, self.target_y, self.target_obj = 'BUILD', tx, ty, {'type': b_type, 'rot': rot}
-    def command_stop(self): self.state, self.target_obj, self.target_x, self.target_y = 'IDLE', None, self.x, self.y
+    def calculate_path(self, tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list):
+        start_pos = (self.x // TILE_SIZE, self.y // TILE_SIZE)
+        target_pos = (tx // TILE_SIZE, ty // TILE_SIZE)
+        self.path = get_astar_path(start_pos, target_pos, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        self.target_x, self.target_y = tx, ty
+
+    def command_move(self, tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
+        self.state, self.target_obj = 'MOVE', None
+        self.is_hidden, self.building_ref = False, None
+        self.calculate_path(tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+
+    def command_harvest(self, resource_obj, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
+        self.state, self.target_obj = 'HARVEST', resource_obj
+        self.is_hidden, self.building_ref = False, None
+        self.calculate_path(resource_obj.x, resource_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+
+    def command_attack(self, obj, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
+        self.state, self.target_obj = 'ATTACK', obj
+        self.is_hidden, self.building_ref = False, None
+        self.calculate_path(obj.x, obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+
+    def command_build(self, target_col, target_row, b_type, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
+        self.state = 'BUILD'
+        self.target_obj = {'type': b_type, 'col': target_col, 'row': target_row}
+        self.is_hidden, self.building_ref = False, None
+        # Celujemy w prawy dolny róg obszaru budowy
+        tx = (target_col * TILE_SIZE) + (BUILDING_STATS[b_type]['w_tiles'] * TILE_SIZE) // 2
+        ty = (target_row * TILE_SIZE) + (BUILDING_STATS[b_type]['h_tiles'] * TILE_SIZE) // 2
+        self.calculate_path(tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+
+    def command_stop(self): 
+        self.state, self.target_obj, self.target_x, self.target_y = 'IDLE', None, self.x, self.y
+        self.path = []
+        self.is_hidden, self.building_ref = False, None
 
     def get_closest_base(self, buildings_list):
         bases = [b for b in buildings_list if b.b_type == 'base' and b.is_built and b.hp > 0]
         if not bases: return None
         return min(bases, key=lambda b: (b.x - self.x)**2 + (b.y - self.y)**2)
 
-    def update(self, res_dict, buildings_list, trees_list, crystals_list, enemies_list, is_obstacle_fn, get_speed_mod, effects_list):
+    def _follow_path(self, game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod):
+        """Mechanizm konsumpcji węzłów ścieżki A*."""
+        if not self.path:
+            # Jeśli brak ścieżki (została zjedzona), przesuń w tryb euklidesowy ostatniej szansy
+            self._move_towards(self.target_x, self.target_y, buildings_list, is_obstacle_fn, get_speed_mod)
+            return
+
+        next_x, next_y = self.path[0]
+        dx, dy = next_x - self.x, next_y - self.y
+        dist = math.hypot(dx, dy)
+        
+        if dist < self.speed * 2:
+            self.path.pop(0) # Punkt osiągnięty, usuwamy go
+            if self.path:
+                next_x, next_y = self.path[0]
+                dx, dy = next_x - self.x, next_y - self.y
+                dist = math.hypot(dx, dy)
+        
+        if dist > 0:
+            current_speed = self.speed * get_speed_mod(self.x, self.y)
+            sx, sy = (dx / dist) * current_speed, (dy / dist) * current_speed
+            can_move_x, can_move_y = not is_obstacle_fn(self.x + sx, self.y), not is_obstacle_fn(self.x, self.y + sy)
+            if can_move_x: self.x += sx
+            if can_move_y: self.y += sy
+
+    def update(self, res_dict, buildings_list, trees_list, crystals_list, enemies_list, is_obstacle_fn, get_speed_mod, effects_list, game_map, MAP_COLS, MAP_ROWS):
+        if self.is_hidden:
+            # Robotnik ukryty w budynku
+            if not self.building_ref or self.building_ref.is_built or self.building_ref.hp <= 0:
+                self.is_hidden = False # Wychodzi po skończeniu budowy lub anulowaniu
+                self.building_ref = None
+                self.state = 'IDLE'
+            return
+
         if self.attack_timer > 0: self.attack_timer -= 1
         closest_base = self.get_closest_base(buildings_list)
 
@@ -175,8 +230,10 @@ class Unit:
                 last_type = self.carry_type
                 self.carry_amount, self.carry_type = 0, None
                 if self.state == 'RETURN':
-                    if self.target_obj and getattr(self.target_obj, 'amount', 0) > 0: self.state = 'HARVEST'
-                    else: self.target_x, self.target_y, self.search_type, self.state = self.last_harvest_x, self.last_harvest_y, last_type, 'SEARCH_MOVE'
+                    if self.target_obj and getattr(self.target_obj, 'amount', 0) > 0: self.command_harvest(self.target_obj, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                    else: 
+                        self.search_type, self.state = last_type, 'SEARCH_MOVE'
+                        self.calculate_path(self.last_harvest_x, self.last_harvest_y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         if self.state == 'IDLE':
             target, min_d_sq = None, self.vision_range * self.vision_range
@@ -184,8 +241,7 @@ class Unit:
                 d_sq = (e.x - self.x)**2 + (e.y - self.y)**2
                 if d_sq < min_d_sq: target, min_d_sq = e, d_sq
                 
-            if target:
-                self.command_attack(target)
+            if target: self.command_attack(target, game_map, MAP_COLS, MAP_ROWS, buildings_list)
             elif self.u_type == 'worker':
                 nearest_res, min_dist_sq = None, (self.radius + 40)**2
                 for t in trees_list:
@@ -194,19 +250,22 @@ class Unit:
                 for c in crystals_list:
                     d_sq = (c.x - self.x)**2 + (c.y - self.y)**2
                     if d_sq < min_dist_sq: nearest_res, min_dist_sq = c, d_sq
-                if nearest_res: self.command_harvest(nearest_res)
+                if nearest_res: self.command_harvest(nearest_res, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'MOVE':
-            self._move_towards(self.target_x, self.target_y, buildings_list, is_obstacle_fn, get_speed_mod)
-            if (self.target_x - self.x)**2 + (self.target_y - self.y)**2 < self.speed*self.speed: self.state = 'IDLE'
+            self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
+            if not self.path and (self.target_x - self.x)**2 + (self.target_y - self.y)**2 < self.speed*self.speed: self.state = 'IDLE'
 
         elif self.state == 'ATTACK':
-            if not self.target_obj or getattr(self.target_obj, 'hp', 0) <= 0: 
-                self.state = 'IDLE'; return
+            if not self.target_obj or getattr(self.target_obj, 'hp', 0) <= 0: self.state = 'IDLE'; return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
             if dist > self.attack_range + self.target_obj.radius:
-                self._move_towards(self.target_obj.x, self.target_obj.y, buildings_list, is_obstacle_fn, get_speed_mod)
+                # Jeśli uciekł, przekalkuluj pathfinding co pewien czas
+                if not self.path and random.random() < 0.05:
+                    self.calculate_path(self.target_obj.x, self.target_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
             else:
+                self.path = [] # Zatrzymanie się do ataku
                 if self.attack_timer <= 0:
                     self.target_obj.hp -= self.damage
                     self.attack_timer = self.attack_cooldown
@@ -215,20 +274,23 @@ class Unit:
                     if hasattr(self.target_obj, 'amount'): self.target_obj.amount = max(0, self.target_obj.amount - self.damage)
 
         elif self.state == 'BUILD':
-            self._move_towards(self.target_x, self.target_y, buildings_list, is_obstacle_fn, get_speed_mod)
-            if (self.target_x - self.x)**2 + (self.target_y - self.y)**2 < (self.speed + 15)**2: 
-                buildings_list.append(Building(self.target_x, self.target_y, self.target_obj['type'], self.target_obj['rot']))
-                angle = math.atan2(self.y - self.target_y, self.x - self.target_x)
-                self.x, self.y = self.target_x + math.cos(angle) * 60, self.target_y + math.sin(angle) * 60
-                self.state = 'IDLE' 
+            dist = math.hypot(self.target_x - self.x, self.target_y - self.y)
+            if dist < self.speed + 25: 
+                # Rozpoczęcie wznoszenia - jednostka "wchodzi do środka" [Baza Treningowa: Operacje modyfikacji stanów jednostek budujących]
+                self.is_hidden = True
+                new_b = Building(self.target_obj['col'], self.target_obj['row'], self.target_obj['type'])
+                buildings_list.append(new_b)
+                self.building_ref = new_b
+            else:
+                self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
 
         elif self.state == 'HARVEST':
-            if not self.target_obj or self.target_obj.amount <= 0: 
-                self.state = 'IDLE'; return
+            if not self.target_obj or self.target_obj.amount <= 0: self.state = 'IDLE'; return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
             if dist > self.target_obj.radius + self.radius + 15:
-                self._move_towards(self.target_obj.x, self.target_obj.y, buildings_list, is_obstacle_fn, get_speed_mod)
+                self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
             else:
+                self.path = []
                 self.last_harvest_x, self.last_harvest_y = self.target_obj.x, self.target_obj.y
                 self.harvest_timer += 1
                 if self.harvest_timer > 60:
@@ -236,45 +298,37 @@ class Unit:
                     self.target_obj.amount -= wg
                     self.target_obj.hp -= wg 
                     self.carry_amount, self.carry_type, self.harvest_timer, self.state = wg, self.target_obj.type, 0, 'RETURN'
+                    if closest_base: self.calculate_path(closest_base.x, closest_base.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'RETURN':
             if not closest_base: self.state = 'IDLE'; return
-            self._move_towards(closest_base.x, closest_base.y, buildings_list, is_obstacle_fn, get_speed_mod)
+            self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
 
         elif self.state == 'SEARCH_MOVE':
-            if (self.target_x - self.x)**2 + (self.target_y - self.y)**2 > self.speed*self.speed:
-                self._move_towards(self.target_x, self.target_y, buildings_list, is_obstacle_fn, get_speed_mod)
-            else:
+            if not self.path and (self.target_x - self.x)**2 + (self.target_y - self.y)**2 > self.speed*self.speed:
+                self._follow_path(game_map, MAP_COLS, MAP_ROWS, buildings_list, is_obstacle_fn, get_speed_mod)
+            elif not self.path:
                 nearest_res, min_dist_sq = None, 750 * 750
                 search_list = trees_list if self.search_type == 'wood' else crystals_list
                 for obj in search_list:
                     d_sq = (obj.x - self.x)**2 + (obj.y - self.y)**2
                     if d_sq < min_dist_sq: nearest_res, min_dist_sq = obj, d_sq
-                if nearest_res: self.command_harvest(nearest_res)
+                if nearest_res: self.command_harvest(nearest_res, game_map, MAP_COLS, MAP_ROWS, buildings_list)
                 else: self.state = 'IDLE'
 
     def _move_towards(self, tx, ty, buildings_list, is_obstacle_fn, get_speed_mod):
+        """Ostatnia instancja ruchu w przypadku braku ścieżki A*."""
         dx, dy = tx - self.x, ty - self.y
         dist = math.hypot(dx, dy)
         if dist > 0:
-            # Woda (rzeka) modyfikuje prędkość
             current_speed = self.speed * get_speed_mod(self.x, self.y)
             sx, sy = (dx / dist) * current_speed, (dy / dist) * current_speed
-            
-            can_move_x, can_move_y = True, True
-            if is_obstacle_fn(self.x + sx, self.y): can_move_x = False
-            if is_obstacle_fn(self.x, self.y + sy): can_move_y = False
-            
-            unit_rect_x = pygame.Rect(self.x + sx - self.radius, self.y - self.radius, self.radius*2, self.radius*2)
-            unit_rect_y = pygame.Rect(self.x - self.radius, self.y + sy - self.radius, self.radius*2, self.radius*2)
-            for b in buildings_list:
-                if b.rect.colliderect(unit_rect_x): can_move_x = False
-                if b.rect.colliderect(unit_rect_y): can_move_y = False
-
+            can_move_x, can_move_y = not is_obstacle_fn(self.x + sx, self.y), not is_obstacle_fn(self.x, self.y + sy)
             if can_move_x: self.x += sx
             if can_move_y: self.y += sy
 
     def draw(self, surface, cam_x, cam_y):
+        if self.is_hidden: return # Nie rysuj robotnika podczas budowania
         sx, sy = int(self.x - cam_x), int(self.y - cam_y)
         col = self.color
         if self.u_type == 'worker': col = YELLOW if self.carry_type == 'wood' else CYAN if self.carry_type == 'crystal' else BLUE
@@ -295,7 +349,7 @@ class Zombie:
         if self.attack_timer > 0: self.attack_timer -= 1
         
         target, min_dist = None, 999999
-        valid_targets = player_units + [b for b in player_buildings if b.b_type != 'cemetery']
+        valid_targets = [u for u in player_units if not u.is_hidden] + [b for b in player_buildings if b.b_type != 'cemetery']
         
         for obj in valid_targets:
             d = math.hypot(obj.x - self.x, obj.y - self.y)
@@ -321,9 +375,10 @@ class Zombie:
         draw_hp_bar(surface, sx, sy, self.hp, self.max_hp)
 
 def resolve_collisions(unit_list, buildings_list, is_obstacle_fn):
-    """Zoptymalizowana i wygładzona relaksacja kolizji (Jitter-Fix)"""
     for i in range(len(unit_list)):
+        if getattr(unit_list[i], 'is_hidden', False): continue
         for j in range(i + 1, len(unit_list)):
+            if getattr(unit_list[j], 'is_hidden', False): continue
             u1, u2 = unit_list[i], unit_list[j]
             dx, dy = u2.x - u1.x, u2.y - u1.y
             dist_sq = dx*dx + dy*dy
@@ -332,8 +387,6 @@ def resolve_collisions(unit_list, buildings_list, is_obstacle_fn):
                 dist = math.sqrt(dist_sq)
                 if dist == 0: dx, dy, dist = 1, 0, 1
                 overlap = min_dist - dist
-                
-                # Zastosowanie amortyzacji w tłoku
                 relax = 0.15 
                 px, py = (dx / dist) * (overlap * relax), (dy / dist) * (overlap * relax)
                 
@@ -344,12 +397,9 @@ def resolve_collisions(unit_list, buildings_list, is_obstacle_fn):
                 u2_rect = pygame.Rect((u2.x + px) - u2.radius, (u2.y + py) - u2.radius, u2.radius*2, u2.radius*2)
                 if not is_obstacle_fn(u2.x + px, u2.y + py) and not any(b.rect.colliderect(u2_rect) for b in buildings_list):
                     u2.x, u2.y = u2.x + px, u2.y + py
-                    
+
 def is_visible(obj, cam_x, cam_y, w, h):
-    """Odrzuca obiekty poza ekranem, oszczędzając zasoby procesora."""
     return (cam_x - 100 < obj.x < cam_x + w + 100) and (cam_y - 100 < obj.y < cam_y + h + 100)
 
 def draw_resource_icon(surface, x, y, type_str):
-    """Rysuje małą ikonkę surowca na interfejsie użytkownika."""
-    # (0, 200, 0) to GREEN, (0, 255, 255) to CYAN
-    pygame.draw.circle(surface, (0, 200, 0) if type_str == 'wood' else (0, 255, 255), (x, y), 6)
+    pygame.draw.circle(surface, GREEN if type_str == 'wood' else CYAN, (x, y), 6)
