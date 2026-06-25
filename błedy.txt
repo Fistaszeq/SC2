@@ -1,2 +1,6 @@
-+Pociski leciały sobie i miały jakiś tam czas lotu i zasięg a nie nagle.
++ Pociski leciały sobie i miały jakiś tam czas lotu i zasięg a nie nagle.
 + Większe mniejsze kalibry aby były widoczne. łócznik != armata.
++ Spowolnić grę.
++ Grafiki dorobić i zająć się animacjami 2D.
++ Tor ruchu jednostki po shifcie.
++ Ciemność w nocy. Za dnia tak jak było.
