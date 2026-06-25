@@ -1,29 +1,3 @@
-1.
-stanis-aw-koz-owski@stanis-aw-koz-owski-ThinkPad-T480:~/Desktop/SC2$ python3 main.py 
-<frozen importlib._bootstrap>:488: RuntimeWarning: Your system is avx2 capable but pygame was not built with support for it. The performance of some of your blits could be adversely affected. Consider enabling compile time detection with environment variables like PYGAME_DETECT_AVX2=1 if you are compiling without cross compilation.
-pygame 2.5.2 (SDL 2.30.0, Python 3.12.3)
-Hello from the pygame community. https://www.pygame.org/contribute.html
-Traceback (most recent call last):
-  File "/home/stanis-aw-koz-owski/Desktop/SC2/main.py", line 436, in <module>
-    for u in units: u.update(res, buildings, trees, crystals, zombies, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS, units)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/stanis-aw-koz-owski/Desktop/SC2/entities.py", line 296, in update
-    best_res = get_available_resource(self, trees_list + crystals_list, all_units)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/stanis-aw-koz-owski/Desktop/SC2/entities.py", line 41, in get_available_resource
-    if getattr(u, 'target_obj', None) in counts and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE']:
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: unhashable type: 'dict'
- 1 stanis-aw-koz-owski@stanis-aw-koz-owski-ThinkPad-T480:~/Desktop/SC2$ 
-
-
-2.
- 1 stanis-aw-koz-owski@stanis-aw-koz-owski-ThinkPad-T480:~/Desktop/SC2$ python3 main.py 
-<frozen importlib._bootstrap>:488: RuntimeWarning: Your system is avx2 capable but pygame was not built with support for it. The performance of some of your blits could be adversely affected. Consider enabling compile time detection with environment variables like PYGAME_DETECT_AVX2=1 if you are compiling without cross compilation.
-pygame 2.5.2 (SDL 2.30.0, Python 3.12.3)
-Hello from the pygame community. https://www.pygame.org/contribute.html
-Traceback (most recent call last):
-  File "/home/stanis-aw-koz-owski/Desktop/SC2/main.py", line 526, in <module>
-    st = BUILDING_STATS[b_type]
-         ~~~~~~~~~~~~~~^^^^^^^^
-KeyError: 'obstower'
+1. Nie działa watch tower, łócznik nie może wejść do środka.
+2. Przydało by się jakoś lepiej altylerie zrobić.
+- Spoko było by aby dało się parę osób do wierzy np 4.

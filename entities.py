@@ -16,7 +16,7 @@ class Tree:
         self.radius = random.randint(12, 28)
         self.amount = self.max_amount = self.radius * 20 
         self.hp = self.max_hp = self.amount
-        self.max_workers = max(1, self.radius // 6) # Dynamiczny limit robotników
+        self.max_workers = max(1, self.radius // 6) 
         self.is_selected, self.type, self.title = False, 'wood', "Złoże Drewna"
         self.color = (random.randint(20, 40), random.randint(100, 150), random.randint(20, 40))
     def draw_hp(self, surface, cam_x, cam_y):
@@ -35,11 +35,12 @@ class Crystal:
         if self.hp < self.max_hp: draw_hp_bar(surface, int(self.x - cam_x), int(self.y - cam_y), self.hp, self.max_hp)
 
 def get_available_resource(unit, res_list, all_units):
-    """Zwraca najbliższy surowiec, który ma jeszcze wolne sloty na pracowników."""
     counts = {r: 0 for r in res_list}
     for u in all_units:
-        if getattr(u, 'target_obj', None) in counts and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE']:
-            counts[u.target_obj] += 1
+        t_obj = getattr(u, 'target_obj', None)
+        if isinstance(t_obj, dict): continue
+        if t_obj in counts and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE']:
+            counts[t_obj] += 1
             
     best, min_d_sq = None, float('inf')
     for r in res_list:
@@ -69,7 +70,6 @@ class Building:
         self.attack_timer, self.spawn_timer = 0, 0
         self.rally_x, self.rally_y = self.x + 80, self.y + 80
         
-        # Mechaniki wieżyczek
         self.turret_angle = 0
         self.garrisoned_unit = None
         
@@ -80,11 +80,9 @@ class Building:
 
     def update(self, enemies_list, effects_list, is_night=False, vision_mask=None):
         if not self.is_built:
-            self.build_progress += 1
-            self.hp = max(1, int(self.max_hp * (self.build_progress / self.build_max)))
+            self.hp = max(1, int(self.max_hp * (self.build_progress / max(1, self.build_max))))
             if self.build_progress >= self.build_max: self.is_built = True
         else:
-            # Wieża Obserwacyjna - mechanika widzenia
             if self.b_type == 'obs_tower':
                 if self.garrisoned_unit:
                     self.vision_range = 600
@@ -93,13 +91,12 @@ class Building:
                         elif enemies_list:
                             for e in enemies_list:
                                 dx, dy = e.x - self.x, e.y - self.y
-                                if (dx*dx + dy*dy) <= (450 * 450): # Mega zasięg z wieży
+                                if (dx*dx + dy*dy) <= (450 * 450):
                                     e.hp -= self.garrisoned_unit.damage * 1.5
                                     effects_list.append({'x1': self.x, 'y1': self.y - 20, 'x2': e.x, 'y2': e.y, 'timer': 8, 'color': WHITE})
                                     self.attack_timer = self.garrisoned_unit.attack_cooldown 
                                     break
-                else:
-                    self.vision_range = 250
+                else: self.vision_range = 250
 
             if self.b_type in ['base', 'barracks']:
                 if self.recruit_queue > 0:
@@ -109,7 +106,6 @@ class Building:
                         return 'spawn_worker' if self.b_type == 'base' else 'spawn_archer'
                 else: self.recruit_progress = 0
             
-            # WIEŻYCZKI: Mogą strzelać tylko w to co widzą (is_in_vision opiera się o dystans i mgłę w main.py, ale uprośćmy: muszą być w vision_range)
             if self.b_type in ['tower', 'double_tower']:
                 if self.attack_timer > 0: self.attack_timer -= 1
                 
@@ -121,12 +117,10 @@ class Building:
                     if d_sq <= min_d: target, min_d = e, d_sq
                         
                 if target:
-                    # Obrót lufy
                     self.turret_angle = math.atan2(target.y - self.y, target.x - self.x)
                     if self.attack_timer <= 0:
                         target.hp -= self.damage
                         if self.b_type == 'double_tower':
-                            # Wizualizacja dwóch strzałów
                             ox, oy = math.cos(self.turret_angle + 1.57)*5, math.sin(self.turret_angle + 1.57)*5
                             effects_list.append({'x1': self.x+ox, 'y1': self.y+oy, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': YELLOW})
                             effects_list.append({'x1': self.x-ox, 'y1': self.y-oy, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': YELLOW})
@@ -149,7 +143,7 @@ class Building:
         
         if not self.is_built:
             pygame.draw.rect(surface, (150, 100, 0), draw_rect, 2)
-            pygame.draw.rect(surface, GREEN, (draw_rect.x, draw_rect.y - 15, int(draw_rect.width * (self.build_progress / self.build_max)), 6))
+            pygame.draw.rect(surface, GREEN, (draw_rect.x, draw_rect.y - 15, int(draw_rect.width * (self.build_progress / max(1, self.build_max))), 6))
         else:
             pygame.draw.rect(surface, self.color, draw_rect)
             
@@ -159,7 +153,7 @@ class Building:
                 pygame.draw.circle(surface, (50, 50, 50), (cx, cy), 15)
                 if self.garrisoned_unit:
                     u_col = BLUE if self.garrisoned_unit.u_type == 'worker' else (150, 200, 150)
-                    pygame.draw.circle(surface, u_col, (cx, cy), 8) # Widoczna jednostka wewnątrz
+                    pygame.draw.circle(surface, u_col, (cx, cy), 8) 
                     
             elif self.b_type == 'tower':
                 pygame.draw.circle(surface, DARK_GRAY, (cx, cy), 12)
@@ -197,6 +191,7 @@ class Unit:
         self.last_harvest_x, self.last_harvest_y, self.search_type = x, y, None
         
         self.path = [] 
+        self.command_queue = []
         self.is_hidden, self.building_ref = False, None
         
         st = UNIT_STATS[u_type]
@@ -211,29 +206,45 @@ class Unit:
         self.path = get_astar_path((self.x//TILE_SIZE, self.y//TILE_SIZE), (tx//TILE_SIZE, ty//TILE_SIZE), game_map, MAP_COLS, MAP_ROWS, buildings_list)
         self.target_x, self.target_y = tx, ty
 
-    def command_move(self, tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
-        self.state, self.target_obj, self.is_hidden, self.building_ref = 'MOVE', None, False, None
-        self.calculate_path(tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+    def issue_command(self, cmd_tuple, shift_pressed, game_map, MAP_COLS, MAP_ROWS, buildings_list):
+        if not shift_pressed or self.state == 'IDLE':
+            self.command_queue.clear()
+            self._execute_cmd(cmd_tuple, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        else:
+            self.command_queue.append(cmd_tuple)
 
-    def command_harvest(self, resource_obj, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
-        self.state, self.target_obj, self.is_hidden, self.building_ref = 'HARVEST', resource_obj, False, None
-        self.calculate_path(resource_obj.x, resource_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+    def _execute_cmd(self, cmd_tuple, game_map, MAP_COLS, MAP_ROWS, buildings_list):
+        cmd_type = cmd_tuple[0]
+        self.is_hidden = False
+        self.building_ref = None
+        if cmd_type == 'MOVE':
+            self.state, self.target_obj = 'MOVE', None
+            self.calculate_path(cmd_tuple[1], cmd_tuple[2], game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        elif cmd_type == 'HARVEST':
+            self.state, self.target_obj = 'HARVEST', cmd_tuple[1]
+            self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        elif cmd_type == 'ATTACK':
+            self.state, self.target_obj = 'ATTACK', cmd_tuple[1]
+            self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        elif cmd_type == 'BUILD':
+            self.state, self.target_obj = 'BUILD', cmd_tuple[1]
+            self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        elif cmd_type == 'GARRISON':
+            self.state, self.target_obj = 'GARRISON', cmd_tuple[1]
+            self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        elif cmd_type == 'REPAIR':
+            self.state, self.target_obj = 'REPAIR', cmd_tuple[1]
+            self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
-    def command_attack(self, obj, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
-        self.state, self.target_obj, self.is_hidden, self.building_ref = 'ATTACK', obj, False, None
-        self.calculate_path(obj.x, obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
-
-    def command_build(self, t_col, t_row, b_type, game_map, MAP_COLS, MAP_ROWS, buildings_list): 
-        self.state, self.target_obj, self.is_hidden, self.building_ref = 'BUILD', {'type': b_type, 'col': t_col, 'row': t_row}, False, None
-        tx = (t_col * TILE_SIZE) + (BUILDING_STATS[b_type]['w_tiles'] * TILE_SIZE) // 2
-        ty = (t_row * TILE_SIZE) + (BUILDING_STATS[b_type]['h_tiles'] * TILE_SIZE) // 2
-        self.calculate_path(tx, ty, game_map, MAP_COLS, MAP_ROWS, buildings_list)
-        
-    def command_garrison(self, tower_obj, game_map, MAP_COLS, MAP_ROWS, buildings_list):
-        self.state, self.target_obj = 'GARRISON', tower_obj
-        self.calculate_path(tower_obj.x, tower_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+    def finish_current_task(self, game_map, MAP_COLS, MAP_ROWS, buildings_list):
+        if self.command_queue:
+            next_cmd = self.command_queue.pop(0)
+            self._execute_cmd(next_cmd, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+        else:
+            self.state, self.target_obj, self.path, self.is_hidden, self.building_ref = 'IDLE', None, [], False, None
 
     def command_stop(self): 
+        self.command_queue.clear()
         self.state, self.target_obj, self.target_x, self.target_y, self.path, self.is_hidden, self.building_ref = 'IDLE', None, self.x, self.y, [], False, None
 
     def get_closest_base(self, buildings_list):
@@ -265,10 +276,20 @@ class Unit:
         if self.is_hidden:
             if self.state == 'GARRISON':
                 if not self.building_ref or self.building_ref.hp <= 0:
-                    self.is_hidden, self.building_ref, self.state = False, None, 'IDLE' # Wieża zniszczona, wyjdź
+                    self.is_hidden, self.building_ref = False, None
+                    self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
             else:
                 if not self.building_ref or self.building_ref.is_built or self.building_ref.hp <= 0:
-                    self.is_hidden, self.building_ref, self.state = False, None, 'IDLE'
+                    self.is_hidden, self.building_ref = False, None
+                    self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
+            
+            if self.state == 'BUILD' and self.is_hidden and self.building_ref == self.target_obj:
+                self.target_obj.build_progress += 1
+                if self.target_obj.build_progress >= self.target_obj.build_max:
+                    self.target_obj.is_built = True
+                    self.is_hidden = False
+                    self.building_ref = None
+                    self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
             return
 
         if self.attack_timer > 0: self.attack_timer -= 1
@@ -280,7 +301,8 @@ class Unit:
                 elif self.carry_type == 'crystal': res_dict['crystals'] += self.carry_amount
                 last_type, self.carry_amount, self.carry_type = self.carry_type, 0, None
                 if self.state == 'RETURN':
-                    if self.target_obj and getattr(self.target_obj, 'amount', 0) > 0: self.command_harvest(self.target_obj, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                    if self.target_obj and getattr(self.target_obj, 'amount', 0) > 0: 
+                        self.issue_command(('HARVEST', self.target_obj), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
                     else: 
                         self.search_type, self.state = last_type, 'SEARCH_MOVE'
                         self.calculate_path(self.last_harvest_x, self.last_harvest_y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
@@ -290,19 +312,21 @@ class Unit:
             for e in enemies_list:
                 d_sq = (e.x - self.x)**2 + (e.y - self.y)**2
                 if d_sq < min_d_sq: target, min_d_sq = e, d_sq
-            if target: self.command_attack(target, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+            if target: 
+                self.issue_command(('ATTACK', target), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
             elif self.u_type == 'worker':
-                # Poszukiwanie Złóż z Limitami [Baza Treningowa: Optymalizacja przydziału zadań agentom]
                 best_res = get_available_resource(self, trees_list + crystals_list, all_units)
                 if best_res and ((best_res.x - self.x)**2 + (best_res.y - self.y)**2) < (self.radius + 60)**2:
-                    self.command_harvest(best_res, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                    self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'MOVE':
             self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
-            if not self.path and (self.target_x - self.x)**2 + (self.target_y - self.y)**2 < self.speed*self.speed: self.state = 'IDLE'
+            if not self.path and (self.target_x - self.x)**2 + (self.target_y - self.y)**2 < self.speed*self.speed: 
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'ATTACK':
-            if not self.target_obj or getattr(self.target_obj, 'hp', 0) <= 0: self.state = 'IDLE'; return
+            if not self.target_obj or getattr(self.target_obj, 'hp', 0) <= 0: 
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
             if dist > self.attack_range + self.target_obj.radius:
                 if not self.path and random.random() < 0.05: self.calculate_path(self.target_obj.x, self.target_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
@@ -316,25 +340,46 @@ class Unit:
                     if hasattr(self.target_obj, 'amount'): self.target_obj.amount = max(0, self.target_obj.amount - self.damage)
 
         elif self.state == 'BUILD':
-            if math.hypot(self.target_x - self.x, self.target_y - self.y) < self.speed + 35: 
+            if getattr(self.target_obj, 'hp', 0) <= 0:
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
+            if self.target_obj.is_built:
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
+
+            if math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y) < self.speed + 35: 
                 self.is_hidden = True
-                new_b = Building(self.target_obj['col'], self.target_obj['row'], self.target_obj['type'])
-                buildings_list.append(new_b); self.building_ref = new_b
+                self.building_ref = self.target_obj
             else: self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
+            
+        elif self.state == 'REPAIR':
+            if getattr(self.target_obj, 'hp', 0) <= 0 or getattr(self.target_obj, 'hp', 0) >= getattr(self.target_obj, 'max_hp', 1):
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
+            
+            dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
+            if dist < self.target_obj.radius + self.radius + 25:
+                self.path = []
+                self.target_obj.hp = min(self.target_obj.max_hp, self.target_obj.hp + 2)
+                if self.target_obj.hp >= self.target_obj.max_hp:
+                    self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
+            else: 
+                self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
 
         elif self.state == 'GARRISON':
+            if getattr(self.target_obj, 'hp', 0) <= 0:
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             if math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y) < self.speed + 35:
                 if not getattr(self.target_obj, 'garrisoned_unit', None):
                     self.is_hidden = True
                     self.target_obj.garrisoned_unit = self
                     self.building_ref = self.target_obj
-                else: self.state = 'IDLE' # Wieża zajęta
+                else: self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
             else: self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
 
         elif self.state == 'HARVEST':
-            if not self.target_obj or self.target_obj.amount <= 0: self.state = 'IDLE'; return
+            if not self.target_obj or self.target_obj.amount <= 0: 
+                self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
-            if dist > self.target_obj.radius + self.radius + 15:
+            # Powiększony promień tolerancji dystansu niweluje drgania wynikające z soft collisions
+            if dist > self.target_obj.radius + self.radius + 25:
                 self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
             else:
                 self.path = []
@@ -348,7 +393,7 @@ class Unit:
                     if closest_base: self.calculate_path(closest_base.x, closest_base.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'RETURN':
-            if not closest_base: self.state = 'IDLE'; return
+            if not closest_base: self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
 
         elif self.state == 'SEARCH_MOVE':
@@ -356,8 +401,8 @@ class Unit:
                 self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
             elif not self.path:
                 best_res = get_available_resource(self, trees_list + crystals_list, all_units)
-                if best_res: self.command_harvest(best_res, game_map, MAP_COLS, MAP_ROWS, buildings_list)
-                else: self.state = 'IDLE'
+                if best_res: self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                else: self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
     def draw(self, surface, cam_x, cam_y):
         if self.is_hidden: return 
@@ -383,14 +428,13 @@ class Zombie:
         target, min_dist = None, 999999
         valid_targets = [u for u in player_units if not u.is_hidden] + [b for b in player_buildings if b.b_type != 'cemetery']
         
-        # Atak zależy od tego czy zombie widzi cel (True FoW odnosi się do nas, ale zombie niech skanują normalnie)
         for obj in valid_targets:
             d = math.hypot(obj.x - self.x, obj.y - self.y)
             if d < min_dist: target, min_dist = obj, d
             
         if target:
             if min_dist > self.attack_range + getattr(target, 'radius', 0):
-                if not self.path and random.random() < 0.05: # Zombie rzadziej przeliczają ścieżki
+                if not self.path and random.random() < 0.05: 
                     self.path = get_astar_path((self.x//TILE_SIZE, self.y//TILE_SIZE), (target.x//TILE_SIZE, target.y//TILE_SIZE), game_map, MAP_COLS, MAP_ROWS, player_buildings, is_zombie=True)
                 
                 if self.path:
@@ -405,7 +449,6 @@ class Zombie:
                         if not is_obstacle_fn(self.x + (dx/dist)*s, self.y): self.x += (dx/dist)*s
                         if not is_obstacle_fn(self.x, self.y + (dy/dist)*s): self.y += (dy/dist)*s
                 else:
-                    # Tępe podążanie
                     dx, dy = target.x - self.x, target.y - self.y
                     if min_dist > 0:
                         s = self.speed * get_speed_mod(self.x, self.y)
@@ -425,10 +468,15 @@ class Zombie:
 
 def resolve_collisions(unit_list, buildings_list, is_obstacle_fn):
     for i in range(len(unit_list)):
-        if getattr(unit_list[i], 'is_hidden', False): continue
+        u1 = unit_list[i]
+        if getattr(u1, 'is_hidden', False): continue
+        if getattr(u1, 'u_type', '') == 'worker' and getattr(u1, 'state', '') != 'IDLE': continue
+        
         for j in range(i + 1, len(unit_list)):
-            if getattr(unit_list[j], 'is_hidden', False): continue
-            u1, u2 = unit_list[i], unit_list[j]
+            u2 = unit_list[j]
+            if getattr(u2, 'is_hidden', False): continue
+            if getattr(u2, 'u_type', '') == 'worker' and getattr(u2, 'state', '') != 'IDLE': continue
+            
             dx, dy = u2.x - u1.x, u2.y - u1.y
             dist_sq = dx*dx + dy*dy
             min_dist = u1.radius + u2.radius

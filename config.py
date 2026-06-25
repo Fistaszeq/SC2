@@ -27,7 +27,7 @@ BUILDING_STATS = {
     'wall':        {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 10, 'cost_c': 0,  'hp': 500, 'build_time': 150, 'color': LIGHT_GRAY, 'title': 'Mur'},
     'tower':       {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 40, 'cost_c': 20, 'hp': 300, 'build_time': 300, 'color': LIGHT_GRAY, 'title': 'Wieżyczka'},
     'obs_tower':   {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 25, 'cost_c': 5,  'hp': 250, 'build_time': 250, 'color': (200, 200, 150), 'title': 'Wieża Obs.'},
-    'base':        {'w_tiles': 2, 'h_tiles': 2, 'cost_w': 200,'cost_c': 100,'hp': 1500,'build_time': 800, 'color': RED, 'title': 'Baza'},
+    'base':        {'w_tiles': 2, 'h_tiles': 2, 'cost_w': 200,'cost_c': 0,'hp': 1500,'build_time': 800, 'color': RED, 'title': 'Baza'},
     'workshop':    {'w_tiles': 2, 'h_tiles': 2, 'cost_w': 80, 'cost_c': 40, 'hp': 600, 'build_time': 450, 'color': (100, 100, 150), 'title': 'Warsztat'},
     'barracks':    {'w_tiles': 2, 'h_tiles': 2, 'cost_w': 50, 'cost_c': 50, 'hp': 400, 'build_time': 600, 'color': PURPLE, 'title': 'Baraki'},
     'double_tower':{'w_tiles': 1, 'h_tiles': 1, 'cost_w': 100,'cost_c': 80, 'hp': 500, 'build_time': 500, 'color': (80, 80, 80), 'title': 'Podwójne Działo'},
