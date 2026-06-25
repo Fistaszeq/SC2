@@ -1,10 +1,9 @@
-# main.py
 import pygame, math, random, json, os
 from config import *
 pygame.init()
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
-pygame.display.set_caption("RTS - Snap to Grid, A* Pathfinding i Znikający Konstruktorzy")
+pygame.display.set_caption("RTS - Prawdziwa Mgła Wojny, Nowe Wieżyczki i UI SC2")
 
 from entities import *
 
@@ -32,53 +31,37 @@ def show_main_menu():
             if event.type == pygame.QUIT: pygame.quit(); exit()
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1: clicked = True
         
-        title_surf = font_title.render("MÓJ STARCRAFT", True, YELLOW)
-        screen.blit(title_surf, (WIDTH//2 - title_surf.get_width()//2, 80))
-        subtitle = font_main.render("Wybierz mapę do gry:", True, LIGHT_GRAY)
-        screen.blit(subtitle, (WIDTH//2 - subtitle.get_width()//2, 160))
-
+        screen.blit(font_title.render("MÓJ STARCRAFT", True, YELLOW), (WIDTH//2 - 200, 80))
         rnd_rect = pygame.Rect(WIDTH//2 - 200, 220, 400, 50)
         pygame.draw.rect(screen, DARK_GRAY, rnd_rect)
         if selected_idx == -1: pygame.draw.rect(screen, GREEN, rnd_rect, 3)
-        else: pygame.draw.rect(screen, UI_BORDER, rnd_rect, 2)
         rnd_txt = font_main.render("Generuj Proceduralnie (Domyślna)", True, WHITE)
-        screen.blit(rnd_txt, (rnd_rect.x + 200 - rnd_txt.get_width()//2, rnd_rect.y + 15))
-        
-        if rnd_rect.collidepoint(mouse_x, mouse_y):
-            pygame.draw.rect(screen, WHITE, rnd_rect, 1)
-            if clicked: selected_idx = -1
+        screen.blit(rnd_txt, (rnd_rect.x + 40, rnd_rect.y + 15))
+        if rnd_rect.collidepoint(mouse_x, mouse_y) and clicked: selected_idx = -1
 
         for i, f in enumerate(files[:6]): 
             f_rect = pygame.Rect(WIDTH//2 - 200, 290 + i*60, 400, 50)
             pygame.draw.rect(screen, DARK_GRAY, f_rect)
             if selected_idx == i: pygame.draw.rect(screen, GREEN, f_rect, 3)
-            else: pygame.draw.rect(screen, UI_BORDER, f_rect, 2)
             f_txt = font_main.render(f"Wczytaj: {f}", True, WHITE)
-            screen.blit(f_txt, (f_rect.x + 200 - f_txt.get_width()//2, f_rect.y + 15))
-            if f_rect.collidepoint(mouse_x, mouse_y):
-                pygame.draw.rect(screen, WHITE, f_rect, 1)
-                if clicked: selected_idx = i
+            screen.blit(f_txt, (f_rect.x + 40, f_rect.y + 15))
+            if f_rect.collidepoint(mouse_x, mouse_y) and clicked: selected_idx = i
 
         start_rect = pygame.Rect(WIDTH//2 - 100, HEIGHT - 150, 200, 60)
         pygame.draw.rect(screen, BLUE, start_rect)
-        pygame.draw.rect(screen, WHITE, start_rect, 2)
         start_txt = font_bold.render("GRAJ", True, WHITE)
-        screen.blit(start_txt, (start_rect.x + 100 - start_txt.get_width()//2, start_rect.y + 20))
-        if start_rect.collidepoint(mouse_x, mouse_y):
-            pygame.draw.rect(screen, GREEN, start_rect, 4)
-            if clicked: return None if selected_idx == -1 else files[selected_idx]
+        screen.blit(start_txt, (start_rect.x + 65, start_rect.y + 20))
+        if start_rect.collidepoint(mouse_x, mouse_y) and clicked: return None if selected_idx == -1 else files[selected_idx]
 
         pygame.display.flip(); clock.tick(60)
 
 selected_map_file = show_main_menu()
 
-# --- INICJALIZACJA DANYCH ---
 MAP_COLS, MAP_ROWS = 50, 50
 WORLD_WIDTH, WORLD_HEIGHT = MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE
 game_map, trees_data, crystals_data, cemetery_data = [], [], [], []
 base_spawn_col, base_spawn_row = 5, 5 
-horde_day, horde_size = 5, 30 
-wave_interval, wave_size = 1, 5 
+horde_day, horde_size, wave_interval, wave_size = 5, 30, 1, 5 
 
 def generate_cool_tactical_map():
     grid = [[0 for _ in range(MAP_COLS)] for _ in range(MAP_ROWS)]
@@ -118,9 +101,7 @@ else:
     for _ in range(8): crystals_data.append((random.randint(450, 550), random.randint(100, 400)))
     for _ in range(20): trees_data.append((random.randint(1300, 1600), random.randint(600, 1200)))
     for _ in range(12): crystals_data.append((random.randint(1400, 1700), random.randint(1300, 1600)))
-    cemetery_data.append((46, 4))
-    cemetery_data.append((46, 44))
-    cemetery_data.append((4, 44))
+    cemetery_data.extend([(46, 4), (46, 44), (4, 44)])
 
 def is_obstacle(x, y):
     col, row = int(x // TILE_SIZE), int(y // TILE_SIZE)
@@ -144,29 +125,27 @@ def get_zombie_spawn_point(buildings_list, max_w, max_h):
         if not any(math.hypot(b.x - zx, b.y - zy) < 1000 for b in bases) and not is_obstacle(zx, zy): return zx, zy
     return 0, 0
 
-res = {'wood': 100, 'crystals': 50} 
+res = {'wood': 200, 'crystals': 100} 
 buildings = [Building(base_spawn_col, base_spawn_row, 'base')]
-buildings[0].is_built = True 
-buildings[0].hp = buildings[0].max_hp
-
+buildings[0].is_built, buildings[0].hp = True, buildings[0].max_hp
 for cc, cr in cemetery_data: buildings.append(Building(cc, cr, 'cemetery'))
-
 trees = [Tree(tx, ty) for tx, ty in trees_data if not is_obstacle(tx, ty)]
 crystals = [Crystal(cx, cy) for cx, cy in crystals_data if not is_obstacle(cx, cy)]
 
 base_x_pixel = (base_spawn_col * TILE_SIZE) + TILE_SIZE
 base_y_pixel = (base_spawn_row * TILE_SIZE) + TILE_SIZE
 units = [Unit(base_x_pixel + 80, base_y_pixel + i * 30, 'worker') for i in range(3)]
-zombies = []
-visual_effects = []
+zombies, visual_effects = [], []
 
 camera_x, camera_y, CAMERA_SPEED, SCROLL_MARGIN, OOB_MARGIN = 0, 0, 15, 20, 300
 is_selecting, selection_start_world, pending_command, wall_rotation, zoom = False, (0, 0), None, 0, 1.0 
 
+# DRZEWO MENU KASKADOWEGO
+worker_menu_state = 'MAIN' # MAIN, BASIC, ADV
+
 global_time = 3200 
 current_day = 1
-horde_spawned = False
-wave_spawned_today = False 
+horde_spawned, wave_spawned_today = False, False 
 last_click_time, last_clicked_type = 0, None
 
 SCALE_X, SCALE_Y = MINIMAP_SIZE / WORLD_WIDTH, MINIMAP_SIZE / WORLD_HEIGHT
@@ -198,22 +177,22 @@ while running:
     world_mouse_x = (mouse_x / zoom) + camera_x
     world_mouse_y = ((mouse_y - TOP_BAR_HEIGHT) / zoom) + camera_y
 
-    current_pop = len([u for u in units if not u.is_hidden]) # Znikający z populacji (opcjonalne ułatwienie widoku)
+    current_pop = len([u for u in units if not u.is_hidden])
     max_pop = 5 + (sum(1 for b in buildings if b.is_built and b.b_type in ['house', 'base']) * 5)
     
     global_time += 1
     new_day = (global_time // DAY_LENGTH_FRAMES) + 1
     if new_day > current_day: 
-        current_day = new_day; horde_spawned = False; wave_spawned_today = False 
+        current_day, horde_spawned, wave_spawned_today = new_day, False, False 
         
     time_ratio = (global_time % DAY_LENGTH_FRAMES) / DAY_LENGTH_FRAMES
     hour, minutes = int(time_ratio * 24), int((time_ratio * 24 % 1) * 60)
     time_str = f"Dzień {current_day} - {hour:02d}:{minutes:02d}"
     
-    phase_name, vision_mod, night_alpha, is_night = "Dzień", 1.0, 50, False
-    if 18 <= hour < 20: phase_name, vision_mod, night_alpha = "Zmierzch", 1.0 - ((hour - 18 + minutes/60) / 2 * 0.5), int(50 + ((hour - 18 + minutes/60) / 2) * 150)
-    elif 20 <= hour or hour < 4: phase_name, vision_mod, night_alpha, is_night = "Noc", 0.5, 200, True
-    elif 4 <= hour < 6: phase_name, vision_mod, night_alpha = "Świt", 0.5 + ((hour - 4 + minutes/60) / 2 * 0.5), int(200 - ((hour - 4 + minutes/60) / 2) * 150)
+    phase_name, is_night = "Dzień", False
+    if 18 <= hour < 20: phase_name = "Zmierzch"
+    elif 20 <= hour or hour < 4: phase_name, is_night = "Noc", True
+    elif 4 <= hour < 6: phase_name = "Świt"
 
     if phase_name == "Noc":
         if current_day == horde_day and hour == 20 and not horde_spawned:
@@ -231,6 +210,9 @@ while running:
 
     if global_message_timer > 0: global_message_timer -= 1
 
+    has_house = any(b.b_type == 'house' and b.is_built for b in buildings)
+    has_workshop = any(b.b_type == 'workshop' and b.is_built for b in buildings)
+
     active_buttons = []
     selected_workers = sum(1 for u in units if u.is_selected and u.u_type == 'worker' and not u.is_hidden)
     selected_bases = [b for b in buildings if b.is_selected and b.b_type == 'base' and b.is_built]
@@ -246,14 +228,27 @@ while running:
         if selected_barracks[0].recruit_queue > 0: active_buttons.append({'id': 'CANCEL_B', 'label': 'Anuluj', 'w': 0, 'c': 0, 'hotkey': 'Esc', 'col': 1, 'row': 0})
     elif selected_workers > 0:
         bst = BUILDING_STATS
-        active_buttons.append({'id': 'B_HOUSE', 'label': 'Domek', 'w': bst['house']['cost_w'], 'c': bst['house']['cost_c'], 'hotkey': 'H', 'col': 0, 'row': 0})
-        active_buttons.append({'id': 'B_BARRACKS', 'label': 'Baraki', 'w': bst['barracks']['cost_w'], 'c': bst['barracks']['cost_c'], 'hotkey': 'B', 'col': 1, 'row': 0})
-        active_buttons.append({'id': 'B_WALL', 'label': 'Mur', 'w': bst['wall']['cost_w'], 'c': bst['wall']['cost_c'], 'hotkey': 'W', 'col': 2, 'row': 0})
-        active_buttons.append({'id': 'B_BASE', 'label': 'Baza', 'w': bst['base']['cost_w'], 'c': bst['base']['cost_c'], 'hotkey': 'Q', 'col': 3, 'row': 0})
-        active_buttons.append({'id': 'B_TOWER', 'label': 'Wieża', 'w': bst['tower']['cost_w'], 'c': bst['tower']['cost_c'], 'hotkey': 'T', 'col': 4, 'row': 0})
+        # Wzorzec Nawigacji Kaskadowej (Menu SC2) [Baza Treningowa: Drzewa decyzji UI]
+        if worker_menu_state == 'MAIN':
+            active_buttons.append({'id': 'MENU_BASIC', 'label': 'Budowle Podst.', 'w': 0, 'c': 0, 'hotkey': '1', 'col': 0, 'row': 0})
+            active_buttons.append({'id': 'MENU_ADV', 'label': 'Budowle Zaaw.', 'w': 0, 'c': 0, 'hotkey': '2', 'col': 1, 'row': 0})
+            active_buttons.append({'id': 'CMD_REPAIR', 'label': 'Napraw', 'w': 0, 'c': 0, 'hotkey': 'N', 'col': 2, 'row': 0})
+        elif worker_menu_state == 'BASIC':
+            active_buttons.append({'id': 'B_BASE', 'label': 'Baza', 'w': bst['base']['cost_w'], 'c': bst['base']['cost_c'], 'hotkey': 'Q', 'col': 0, 'row': 0})
+            active_buttons.append({'id': 'B_HOUSE', 'label': 'Magazyn', 'w': bst['house']['cost_w'], 'c': bst['house']['cost_c'], 'hotkey': 'H', 'col': 1, 'row': 0})
+            active_buttons.append({'id': 'B_WALL', 'label': 'Mur', 'w': bst['wall']['cost_w'], 'c': bst['wall']['cost_c'], 'hotkey': 'W', 'col': 2, 'row': 0})
+            active_buttons.append({'id': 'B_TOWER', 'label': 'Wieżyczka', 'w': bst['tower']['cost_w'], 'c': bst['tower']['cost_c'], 'hotkey': 'T', 'col': 3, 'row': 0})
+            active_buttons.append({'id': 'B_OBSTOWER', 'label': 'Wieża Obs.', 'w': bst['obs_tower']['cost_w'], 'c': bst['obs_tower']['cost_c'], 'hotkey': 'O', 'col': 4, 'row': 0})
+            active_buttons.append({'id': 'B_WORKSHOP', 'label': 'Warsztat', 'w': bst['workshop']['cost_w'], 'c': bst['workshop']['cost_c'], 'hotkey': 'K', 'col': 5, 'row': 0, 'disabled': not has_house})
+            active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 'hotkey': 'Esc', 'col': 6, 'row': 0})
+        elif worker_menu_state == 'ADV':
+            active_buttons.append({'id': 'B_BARRACKS', 'label': 'Baraki', 'w': bst['barracks']['cost_w'], 'c': bst['barracks']['cost_c'], 'hotkey': 'B', 'col': 0, 'row': 0, 'disabled': not has_workshop})
+            active_buttons.append({'id': 'B_DOUBLETOWER', 'label': 'Podwójne Dzi.', 'w': bst['double_tower']['cost_w'], 'c': bst['double_tower']['cost_c'], 'hotkey': 'D', 'col': 1, 'row': 0, 'disabled': not has_workshop})
+            active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 'hotkey': 'Esc', 'col': 2, 'row': 0})
 
-    cmd_card_start_x, cmd_card_start_y = WIDTH - 500, BOTTOM_UI_Y + 30
-    for btn in active_buttons: btn['rect'] = pygame.Rect(cmd_card_start_x + (btn['col'] * 90), cmd_card_start_y + (btn['row'] * 60), 80, 50)
+    cmd_card_start_x, cmd_card_start_y = WIDTH - 650, BOTTOM_UI_Y + 15
+    for btn in active_buttons:
+        btn['rect'] = pygame.Rect(cmd_card_start_x + (btn['col'] * 90), cmd_card_start_y + (btn['row'] * 60), 80, 50)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT: running = False
@@ -273,23 +268,36 @@ while running:
                     if u.is_selected: u.command_stop()
                 pending_command = None
             elif event.key == pygame.K_m: pending_command = 'MOVE'
-            elif event.key == pygame.K_a: pending_command = 'ATTACK'
-            elif selected_workers > 0:
-                if event.key == pygame.K_h: pending_command = 'BUILD_house'
-                elif event.key == pygame.K_b: pending_command = 'BUILD_barracks'
-                elif event.key == pygame.K_w: pending_command = 'BUILD_wall'
-                elif event.key == pygame.K_q: pending_command = 'BUILD_base'
-                elif event.key == pygame.K_t: pending_command = 'BUILD_tower'
-                elif event.key == pygame.K_ESCAPE and pending_command: pending_command = None
+            elif event.key == pygame.K_a:
+                if selected_barracks:
+                    a_cost = UNIT_STATS['archer']
+                    if current_pop + selected_barracks[0].recruit_queue >= max_pop: show_message("Limit Populacji!")
+                    elif res['wood'] >= a_cost['cost_wood'] and res['crystals'] >= a_cost['cost_crystal']: 
+                        res['wood'] -= a_cost['cost_wood']; res['crystals'] -= a_cost['cost_crystal']; selected_barracks[0].recruit_queue += 1
+                else: pending_command = 'ATTACK'
             elif event.key == pygame.K_r and selected_bases:
                 w_cost = UNIT_STATS['worker']
                 if current_pop + selected_bases[0].recruit_queue >= max_pop: show_message("Limit Populacji!")
                 elif res['wood'] >= w_cost['cost_wood']: res['wood'] -= w_cost['cost_wood']; selected_bases[0].recruit_queue += 1
-            elif event.key == pygame.K_a and selected_barracks:
-                a_cost = UNIT_STATS['archer']
-                if current_pop + selected_barracks[0].recruit_queue >= max_pop: show_message("Limit Populacji!")
-                elif res['wood'] >= a_cost['cost_wood'] and res['crystals'] >= a_cost['cost_crystal']: 
-                    res['wood'] -= a_cost['cost_wood']; res['crystals'] -= a_cost['cost_crystal']; selected_barracks[0].recruit_queue += 1
+                
+            elif selected_workers > 0:
+                if event.key == pygame.K_ESCAPE:
+                    if pending_command: pending_command = None
+                    elif worker_menu_state in ['BASIC', 'ADV']: worker_menu_state = 'MAIN'
+                elif worker_menu_state == 'MAIN':
+                    if event.key == pygame.K_1: worker_menu_state = 'BASIC'
+                    elif event.key == pygame.K_2: worker_menu_state = 'ADV'
+                elif worker_menu_state == 'BASIC':
+                    if event.key == pygame.K_h: pending_command = 'BUILD_house'
+                    elif event.key == pygame.K_w: pending_command = 'BUILD_wall'
+                    elif event.key == pygame.K_q: pending_command = 'BUILD_base'
+                    elif event.key == pygame.K_t: pending_command = 'BUILD_tower'
+                    elif event.key == pygame.K_o: pending_command = 'BUILD_obs_tower'
+                    elif event.key == pygame.K_k:
+                        if has_house: pending_command = 'BUILD_workshop'
+                elif worker_menu_state == 'ADV':
+                    if event.key == pygame.K_b and has_workshop: pending_command = 'BUILD_barracks'
+                    elif event.key == pygame.K_d and has_workshop: pending_command = 'BUILD_double_tower'
                 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -299,7 +307,11 @@ while running:
                     for btn in active_buttons:
                         if btn['rect'].collidepoint(mouse_x, mouse_y):
                             clicked_ui = True
-                            if btn['id'] == 'R_WORKER' and selected_bases:
+                            if btn.get('disabled'): show_message("Wymagania niespełnione!")
+                            elif btn['id'] == 'MENU_BASIC': worker_menu_state = 'BASIC'
+                            elif btn['id'] == 'MENU_ADV': worker_menu_state = 'ADV'
+                            elif btn['id'] == 'MENU_BACK': worker_menu_state = 'MAIN'
+                            elif btn['id'] == 'R_WORKER' and selected_bases:
                                 w_cost = UNIT_STATS['worker']
                                 if current_pop + selected_bases[0].recruit_queue >= max_pop: show_message("Limit Populacji!")
                                 elif res['wood'] >= w_cost['cost_wood']: res['wood'] -= w_cost['cost_wood']; selected_bases[0].recruit_queue += 1
@@ -313,7 +325,7 @@ while running:
                                     selected_bases[0].recruit_queue -= 1; res['wood'] += UNIT_STATS['worker']['cost_wood']
                                 elif selected_barracks and selected_barracks[0].recruit_queue > 0:
                                     selected_barracks[0].recruit_queue -= 1; res['wood'] += UNIT_STATS['archer']['cost_wood']; res['crystals'] += UNIT_STATS['archer']['cost_crystal']
-                            elif btn['id'].startswith('B_'): pending_command = 'BUILD_' + btn['id'].split('_')[1].lower()
+                            elif btn['id'].startswith('B_'): pending_command = 'BUILD_' + btn['id'].replace('B_', '').lower()
                     if not clicked_ui: pending_command = None
                 
                 else:
@@ -330,18 +342,18 @@ while running:
                         pending_command = None; continue
                         
                     elif pending_command and pending_command.startswith('BUILD_'):
-                        b_type = pending_command.split('_')[1]
+                        b_type = pending_command.replace('BUILD_', '')
+                        if b_type == 'obs_tower': b_type = 'obs_tower'
+                        elif b_type == 'double_tower': b_type = 'double_tower'
                         st = BUILDING_STATS[b_type]
-                        # Snap to grid koordynaty (Tile Index)
-                        target_col = int(world_mouse_x // TILE_SIZE)
-                        target_row = int(world_mouse_y // TILE_SIZE)
+                        t_col, t_row = int(world_mouse_x // TILE_SIZE), int(world_mouse_y // TILE_SIZE)
                         
                         can_build = True
-                        for r_check in range(target_row, target_row + st['h_tiles']):
-                            for c_check in range(target_col, target_col + st['w_tiles']):
+                        for r_check in range(t_row, t_row + st['h_tiles']):
+                            for c_check in range(t_col, t_col + st['w_tiles']):
                                 if is_obstacle(c_check * TILE_SIZE, r_check * TILE_SIZE): can_build = False
                         
-                        check_rect = pygame.Rect(target_col * TILE_SIZE, target_row * TILE_SIZE, st['w_tiles'] * TILE_SIZE, st['h_tiles'] * TILE_SIZE)
+                        check_rect = pygame.Rect(t_col * TILE_SIZE, t_row * TILE_SIZE, st['w_tiles'] * TILE_SIZE, st['h_tiles'] * TILE_SIZE)
                         if any(b.rect.colliderect(check_rect) for b in buildings): can_build = False
                         
                         if can_build:
@@ -349,7 +361,7 @@ while running:
                                 res['wood'] -= st['cost_w']; res['crystals'] -= st['cost_c']
                                 for u in units:
                                     if u.is_selected and u.u_type == 'worker' and not u.is_hidden: 
-                                        u.command_build(target_col, target_row, b_type, game_map, MAP_COLS, MAP_ROWS, buildings)
+                                        u.command_build(t_col, t_row, b_type, game_map, MAP_COLS, MAP_ROWS, buildings)
                             else: show_message("Brak surowców na budowę!")
                         if b_type != 'wall': pending_command = None 
                         continue
@@ -388,9 +400,12 @@ while running:
                         clicked_res = next((t for t in trees if math.hypot(t.x - world_mouse_x, t.y - world_mouse_y) <= t.radius), None)
                         if not clicked_res: clicked_res = next((c for c in crystals if math.hypot(c.x - world_mouse_x, c.y - world_mouse_y) <= c.radius), None)
                         clicked_enemy = next((z for z in reversed(zombies) if math.hypot(z.x - world_mouse_x, z.y - world_mouse_y) <= z.radius), None)
+                        clicked_b = next((b for b in buildings if b.rect.collidepoint(world_mouse_x, world_mouse_y)), None)
+                        
                         for u in units:
                             if u.is_selected and not u.is_hidden:
-                                if clicked_enemy: u.command_attack(clicked_enemy, game_map, MAP_COLS, MAP_ROWS, buildings)
+                                if clicked_b and clicked_b.b_type == 'obs_tower': u.command_garrison(clicked_b, game_map, MAP_COLS, MAP_ROWS, buildings) # GARRISON
+                                elif clicked_enemy: u.command_attack(clicked_enemy, game_map, MAP_COLS, MAP_ROWS, buildings)
                                 elif clicked_res and u.u_type == 'worker': u.command_harvest(clicked_res, game_map, MAP_COLS, MAP_ROWS, buildings)
                                 else: u.command_move(world_mouse_x, world_mouse_y, game_map, MAP_COLS, MAP_ROWS, buildings)
 
@@ -411,15 +426,15 @@ while running:
     camera_y = max(-OOB_MARGIN, min(camera_y, WORLD_HEIGHT - v_height + OOB_MARGIN))
 
     for b in buildings:
-        result = b.update(zombies, visual_effects, is_night)
+        result = b.update(zombies, visual_effects, is_night) # Wieże strzelają tylko w widziane obiekty
         if result == 'spawn_worker':
             u = Unit(b.rect.centerx, b.rect.centery, 'worker'); u.command_move(b.rally_x, b.rally_y, game_map, MAP_COLS, MAP_ROWS, buildings); units.append(u)
         elif result == 'spawn_archer':
             u = Unit(b.rect.centerx, b.rect.centery, 'archer'); u.command_move(b.rally_x, b.rally_y, game_map, MAP_COLS, MAP_ROWS, buildings); units.append(u)
         elif result == 'spawn_zombie': zombies.append(Zombie(b.rect.centerx, b.rect.centery + 40))
 
-    for u in units: u.update(res, buildings, trees, crystals, zombies, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS)
-    for z in zombies: z.update(units, buildings, is_obstacle, get_speed_mod, visual_effects)
+    for u in units: u.update(res, buildings, trees, crystals, zombies, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS, units)
+    for z in zombies: z.update(units, buildings, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS)
     
     for ef in visual_effects: ef['timer'] -= 1
     visual_effects = [ef for ef in visual_effects if ef['timer'] > 0]
@@ -431,7 +446,28 @@ while running:
     units = [u for u in units if u.hp > 0]; buildings = [b for b in buildings if b.hp > 0]
     zombies = [z for z in zombies if z.hp > 0]
 
-    # RENDEROWANIE ŚWIATA
+    # --- TRUE FOG OF WAR (WIZJA) [Baza Treningowa: Maskowanie powierzchni Alpha] ---
+    if fog_surface.get_size() != (int(v_width), int(v_height)):
+        fog_surface = pygame.Surface((int(v_width), int(v_height)), pygame.SRCALPHA)
+        
+    # Mgła jest absolutnie czarna, zasłaniając teren bez litości (A = 255)
+    fog_surface.fill((0, 0, 0, 255))
+    
+    for u in units: 
+        if not u.is_hidden: pygame.draw.circle(fog_surface, (0, 0, 0, 0), (int(u.x - camera_x), int(u.y - camera_y)), int(u.vision_range))
+    for b in buildings: 
+        if b.is_built and b.b_type != 'cemetery': 
+            pygame.draw.circle(fog_surface, (0, 0, 0, 0), (int(b.rect.centerx - camera_x), int(b.rect.centery - camera_y)), int(b.vision_range))
+    
+    # Funkcja weryfikująca, czy dany obiekt jest w wyciętym przezroczystym polu, co decyduje o jego rysowaniu
+    def is_in_vision(world_x, world_y):
+        for u in units:
+            if not u.is_hidden and (u.x - world_x)**2 + (u.y - world_y)**2 <= u.vision_range**2: return True
+        for b in buildings:
+            if b.is_built and b.b_type != 'cemetery' and (b.rect.centerx - world_x)**2 + (b.rect.centery - world_y)**2 <= b.vision_range**2: return True
+        return False
+
+    # --- RENDEROWANIE ŚWIATA ---
     screen.fill(BLACK)
     world_surface = pygame.Surface((v_width, v_height))
     world_surface.fill(GRASS_COLOR)
@@ -448,7 +484,10 @@ while running:
             elif val == 6: pygame.draw.rect(world_surface, DIRT_COLOR, rect)
 
     for b in buildings:
-        if is_visible(b, camera_x, camera_y, v_width, v_height): b.draw(world_surface, camera_x, camera_y)
+        if is_visible(b, camera_x, camera_y, v_width, v_height):
+            if b.b_type != 'cemetery' or is_in_vision(b.rect.centerx, b.rect.centery):
+                b.draw(world_surface, camera_x, camera_y)
+                
     for c in crystals:
         if is_visible(c, camera_x, camera_y, v_width, v_height):
             cx, cy = int(c.x - camera_x), int(c.y - camera_y)
@@ -461,8 +500,11 @@ while running:
             if t.is_selected: pygame.draw.circle(world_surface, WHITE, (tx, ty), t.radius + 2, 1)
     for u in units:
         if not u.is_hidden and is_visible(u, camera_x, camera_y, v_width, v_height): u.draw(world_surface, camera_x, camera_y)
+    
+    # CULLING WROGA - Zombie rysują się tylko jeśli widzi je gracz
     for z in zombies:
-        if is_visible(z, camera_x, camera_y, v_width, v_height): z.draw(world_surface, camera_x, camera_y)
+        if is_visible(z, camera_x, camera_y, v_width, v_height) and is_in_vision(z.x, z.y): 
+            z.draw(world_surface, camera_x, camera_y)
         
     for ef in visual_effects:
         pygame.draw.line(world_surface, ef['color'], (ef['x1'] - camera_x, ef['y1'] - camera_y), (ef['x2'] - camera_x, ef['y2'] - camera_y), 2)
@@ -478,7 +520,9 @@ while running:
         pygame.draw.line(world_surface, RED, (world_mouse_x - camera_x - 10, world_mouse_y - camera_y), (world_mouse_x - camera_x + 10, world_mouse_y - camera_y))
         pygame.draw.line(world_surface, RED, (world_mouse_x - camera_x, world_mouse_y - camera_y - 10), (world_mouse_x - camera_x, world_mouse_y - camera_y + 10))
     elif pending_command and pending_command.startswith('BUILD_'):
-        b_type = pending_command.split('_')[1]
+        b_type = pending_command.replace('BUILD_', '')
+        if b_type == 'obs_tower': b_type = 'obs_tower'
+        elif b_type == 'double_tower': b_type = 'double_tower'
         st = BUILDING_STATS[b_type]
         t_col, t_row = int(world_mouse_x // TILE_SIZE), int(world_mouse_y // TILE_SIZE)
         
@@ -496,17 +540,7 @@ while running:
         pygame.draw.rect(s, (255, 255, 255, 150), (0, 0, st['w_tiles'] * TILE_SIZE, st['h_tiles'] * TILE_SIZE), 2)
         world_surface.blit(s, (t_col * TILE_SIZE - camera_x, t_row * TILE_SIZE - camera_y))
 
-    if fog_surface.get_size() != (int(v_width), int(v_height)):
-        fog_surface = pygame.Surface((int(v_width), int(v_height)))
-    fog_surface.fill(NIGHT_COLOR)
-    
-    for u in units: 
-        if not u.is_hidden: pygame.draw.circle(fog_surface, MAGENTA, (int(u.x - camera_x), int(u.y - camera_y)), int(u.vision_range * vision_mod))
-    for b in buildings: 
-        if b.is_built: pygame.draw.circle(fog_surface, MAGENTA, (int(b.rect.centerx - camera_x), int(b.rect.centery - camera_y)), int(b.vision_range * vision_mod))
-    
-    fog_surface.set_colorkey(MAGENTA)
-    fog_surface.set_alpha(night_alpha)
+    # Aplikacja Maski Prawdziwej Mgły
     world_surface.blit(fog_surface, (0, 0))
 
     scaled_world = pygame.transform.scale(world_surface, (WIDTH, VIEW_HEIGHT))
@@ -529,7 +563,8 @@ while running:
     screen.blit(minimap_bg, (20, BOTTOM_UI_Y + 10))
     for u in units: 
         if not u.is_hidden: pygame.draw.rect(screen, BLUE, (20 + int(u.x * SCALE_X), BOTTOM_UI_Y + 10 + int(u.y * SCALE_Y), 2, 2))
-    for z in zombies: pygame.draw.rect(screen, RED, (20 + int(z.x * SCALE_X), BOTTOM_UI_Y + 10 + int(z.y * SCALE_Y), 2, 2))
+    for z in zombies:
+        if is_in_vision(z.x, z.y): pygame.draw.rect(screen, RED, (20 + int(z.x * SCALE_X), BOTTOM_UI_Y + 10 + int(z.y * SCALE_Y), 2, 2))
     pygame.draw.rect(screen, WHITE, (20 + int(camera_x * SCALE_X), BOTTOM_UI_Y + 10 + int(camera_y * SCALE_Y), int(v_width * SCALE_X), int(v_height * SCALE_Y)), 1)
     pygame.draw.line(screen, UI_BORDER, (180, BOTTOM_UI_Y), (180, HEIGHT), 2)
 
@@ -552,7 +587,7 @@ while running:
             pygame.draw.rect(screen, GREEN, (info_x, BOTTOM_UI_Y + 100, int(160 * (target.recruit_progress / target.recruit_time_max)), 12))
     else:
         selected_buildings = [b for b in buildings if b.is_selected]
-        selected_zombies = [z for z in zombies if z.is_selected]
+        selected_zombies = [z for z in zombies if z.is_selected and is_in_vision(z.x, z.y)]
         if len(selected_buildings) > 0:
             target = selected_buildings[0]
             screen.blit(font_bold.render(target.title, True, WHITE), (info_x, BOTTOM_UI_Y + 20))
@@ -570,10 +605,12 @@ while running:
                 target = selected_crystals[0]
                 screen.blit(font_bold.render(target.title, True, CYAN), (info_x, BOTTOM_UI_Y + 20))
                 screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (info_x, BOTTOM_UI_Y + 50))
+                screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 80))
             elif len(selected_trees) > 0:
                 target = selected_trees[0]
                 screen.blit(font_bold.render(target.title, True, GREEN), (info_x, BOTTOM_UI_Y + 20))
                 screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (info_x, BOTTOM_UI_Y + 50))
+                screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 80))
             elif len([u for u in units if u.is_selected and not u.is_hidden]) > 0:
                 count = len([u for u in units if u.is_selected and not u.is_hidden])
                 screen.blit(font_bold.render(f"Zaznaczone jednostki ({count})", True, WHITE), (info_x, BOTTOM_UI_Y + 20))
@@ -584,18 +621,21 @@ while running:
     pygame.draw.rect(screen, (20, 25, 30), (cmd_card_start_x - 20, BOTTOM_UI_Y, WIDTH, UI_HEIGHT)) 
 
     for btn in active_buttons:
-        pygame.draw.rect(screen, (50, 60, 80), btn['rect'])
+        btn_color = (30, 40, 50) if btn.get('disabled') else ((80, 100, 120) if btn.get('active') else (50, 60, 80))
+        txt_color = (100, 100, 100) if btn.get('disabled') else WHITE
+        
+        pygame.draw.rect(screen, btn_color, btn['rect'])
         pygame.draw.rect(screen, UI_BORDER, btn['rect'], 2)
-        text_surf = font_main.render(btn['label'], True, WHITE)
+        text_surf = font_main.render(btn['label'], True, txt_color)
         screen.blit(text_surf, (btn['rect'].x + (btn['rect'].width - text_surf.get_width()) // 2, btn['rect'].y + 5))
         
         if btn['w'] > 0 or btn['c'] > 0:
             cx, cy = btn['rect'].x + 5, btn['rect'].y + 35
             if btn['w'] > 0:
-                draw_resource_icon(screen, cx, cy, 'wood'); wsurf = font_small.render(str(btn['w']), True, WHITE)
+                draw_resource_icon(screen, cx, cy, 'wood'); wsurf = font_small.render(str(btn['w']), True, txt_color)
                 screen.blit(wsurf, (cx + 10, cy - 6)); cx += wsurf.get_width() + 20
             if btn['c'] > 0:
-                draw_resource_icon(screen, cx, cy, 'crystal'); csurf = font_small.render(str(btn['c']), True, WHITE)
+                draw_resource_icon(screen, cx, cy, 'crystal'); csurf = font_small.render(str(btn['c']), True, txt_color)
                 screen.blit(csurf, (cx + 10, cy - 6))
             
         screen.blit(font_small.render(btn['hotkey'], True, LIGHT_GRAY), (btn['rect'].x + 2, btn['rect'].y + 2))
