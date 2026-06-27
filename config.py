@@ -22,16 +22,40 @@ WATER_COLOR = (41, 128, 185)
 
 DAY_LENGTH_FRAMES = 14000
 
+IMAGE_PATHS = {
+    'worker': '',
+    'archer': '',
+    'zombie': '',
+    'house': '',
+    'wood_wall': '',
+    'stone_wall': '',
+    'tower': '',
+    'double_tower': '',
+    'obs_tower': '',
+    'artillery': '',
+    'base': '',
+    'workshop': '',
+    'barracks': '',
+    'cemetery': '',
+    'torch': '',
+    'large_torch': '',
+    'wood': '',
+    'crystal': '',
+    'stone': ''
+}
+
 UNIT_STATS = {
-    'worker': {'speed': 3.0, 'hp': 50, 'vision': 150, 'damage': 5, 'range': 15, 'cooldown': 30, 'cost_wood': 50, 'cost_crystal': 0, 'cost_stone': 0, 'title': 'Robotnik'},
-    'archer': {'speed': 3.5, 'hp': 80, 'vision': 250, 'damage': 15, 'range': 180, 'cooldown': 45, 'cost_wood': 60, 'cost_crystal': 20, 'cost_stone': 0, 'title': 'Łucznik'},
-    'zombie': {'speed': 2.0, 'hp': 100, 'vision': 200, 'damage': 10, 'range': 15, 'cooldown': 30, 'title': 'Zombie'}
+    'worker': {'speed': 1.8, 'hp': 50, 'vision': 150, 'damage': 5, 'range': 15, 'cooldown': 40, 'cost_wood': 50, 'cost_crystal': 0, 'cost_stone': 0, 'title': 'Robotnik'},
+    'archer': {'speed': 2.1, 'hp': 80, 'vision': 250, 'damage': 15, 'range': 180, 'cooldown': 60, 'cost_wood': 60, 'cost_crystal': 20, 'cost_stone': 0, 'title': 'Łucznik'},
+    'zombie': {'speed': 1.2, 'hp': 100, 'vision': 200, 'damage': 10, 'range': 15, 'cooldown': 45, 'title': 'Zombie'}
 }
 
 BUILDING_STATS = {
     'house':       {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 30, 'cost_c': 0,  'cost_s': 0,  'hp': 200, 'build_time': 200, 'color': BLUE, 'title': 'Magazyn / Dom'},
     'wood_wall':   {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 10, 'cost_c': 0,  'cost_s': 0,  'hp': 200, 'build_time': 100, 'color': (139, 69, 19), 'title': 'Drev. Mur'},
     'stone_wall':  {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 0,  'cost_c': 0,  'cost_s': 15, 'hp': 500, 'build_time': 200, 'color': (100, 100, 100), 'title': 'Kam. Mur'},
+    'torch':       {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 10, 'cost_c': 0,  'cost_s': 0,  'hp': 50,  'build_time': 50,  'color': (200, 100, 0), 'title': 'Pochodnia'},
+    'large_torch': {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 25, 'cost_c': 0,  'cost_s': 10, 'hp': 150, 'build_time': 120, 'color': (255, 120, 0), 'title': 'Duża Poch.'},
     'tower':       {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 40, 'cost_c': 20, 'cost_s': 10, 'hp': 300, 'build_time': 300, 'color': LIGHT_GRAY, 'title': 'Wieżyczka'},
     'double_tower':{'w_tiles': 1, 'h_tiles': 1, 'cost_w': 80, 'cost_c': 40, 'cost_s': 20, 'hp': 400, 'build_time': 400, 'color': LIGHT_GRAY, 'title': 'Podwójne Dzi.'},
     'obs_tower':   {'w_tiles': 1, 'h_tiles': 1, 'cost_w': 25, 'cost_c': 5,  'cost_s': 0,  'hp': 250, 'build_time': 250, 'color': (200, 200, 150), 'title': 'Wieża Obs.'},

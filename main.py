@@ -2,6 +2,24 @@ import pygame, math, random, json, os
 from config import *
 pygame.init()
 
+LOADED_IMAGES = {}
+for key, path in IMAGE_PATHS.items():
+    if path and path.strip() != "" and os.path.exists(path):
+        try:
+            img = pygame.image.load(path).convert_alpha()
+            if key in UNIT_STATS:
+                rad = 12 if key == 'worker' else 10
+                if key == 'zombie': rad = 14
+                img = pygame.transform.scale(img, (rad*2, rad*2))
+            elif key in BUILDING_STATS:
+                st = BUILDING_STATS[key]
+                img = pygame.transform.scale(img, (st['w_tiles']*TILE_SIZE, st['h_tiles']*TILE_SIZE))
+            elif key in ['wood', 'crystal', 'stone']:
+                img = pygame.transform.scale(img, (40, 40))
+            LOADED_IMAGES[key] = img
+        except Exception as e:
+            print(f"Błąd ładowania grafiki {path}: {e}")
+
 WIDTH, HEIGHT = 1024, 768
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("RTS - Prawdziwa Mgła Wojny, Nowe Wieżyczki i UI SC2")
@@ -64,6 +82,9 @@ while True:
     WORLD_WIDTH, WORLD_HEIGHT = MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE
     game_map, trees_data, crystals_data, stones_data, cemetery_data = [], [], [], [], []
     base_spawn_col, base_spawn_row = 5, 5 
+    
+    MAX_ZOMBIES = 200
+    global_zombie_queue = 0
     
     day_length_frames = 14000
     horde_day, horde_size = 5, 30
@@ -161,7 +182,10 @@ while True:
     base_x_pixel = (base_spawn_col * TILE_SIZE) + TILE_SIZE
     base_y_pixel = (base_spawn_row * TILE_SIZE) + TILE_SIZE
     units = [Unit(base_x_pixel + 80, base_y_pixel + i * 30, 'worker') for i in range(3)]
-    zombies, visual_effects = [], []
+    
+    zombies = []
+    visual_effects = []
+    projectiles = [] 
     
     camera_x, camera_y, CAMERA_SPEED, SCROLL_MARGIN, OOB_MARGIN = 0, 0, 15, 20, 300
     is_selecting, selection_start_world, pending_command, wall_rotation, zoom = False, (0, 0), None, 0, 1.0 
@@ -254,7 +278,9 @@ while True:
                 
                 active_buttons.append({'id': 'B_OBSTOWER', 'label': 'Wieża Obs.', 'w': bst['obs_tower']['cost_w'], 'c': bst['obs_tower']['cost_c'], 's': bst['obs_tower'].get('cost_s',0), 'hotkey': 'O', 'col': 0, 'row': 1})
                 active_buttons.append({'id': 'B_WORKSHOP', 'label': 'Warsztat', 'w': bst['workshop']['cost_w'], 'c': bst['workshop']['cost_c'], 's': bst['workshop'].get('cost_s',0), 'hotkey': 'K', 'col': 1, 'row': 1, 'disabled': not has_house})
-                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 2, 'row': 1})
+                active_buttons.append({'id': 'B_TORCH', 'label': 'Pochodnia', 'w': bst['torch']['cost_w'], 'c': bst['torch']['cost_c'], 's': bst['torch'].get('cost_s',0), 'hotkey': 'L', 'col': 2, 'row': 1})
+                active_buttons.append({'id': 'B_LARGETORCH', 'label': 'Duża Poch.', 'w': bst['large_torch']['cost_w'], 'c': bst['large_torch']['cost_c'], 's': bst['large_torch'].get('cost_s',0), 'hotkey': 'J', 'col': 3, 'row': 1})
+                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 4, 'row': 1})
             elif worker_menu_state == 'ADV':
                 active_buttons.append({'id': 'B_BARRACKS', 'label': 'Baraki', 'w': bst['barracks']['cost_w'], 'c': bst['barracks']['cost_c'], 's': bst['barracks'].get('cost_s',0), 'hotkey': 'B', 'col': 0, 'row': 0, 'disabled': not has_workshop})
                 active_buttons.append({'id': 'B_DOUBLETOWER', 'label': 'Podwójne Dzi.', 'w': bst['double_tower']['cost_w'], 'c': bst['double_tower']['cost_c'], 's': bst['double_tower'].get('cost_s',0), 'hotkey': 'D', 'col': 1, 'row': 0, 'disabled': not has_workshop})
@@ -265,6 +291,9 @@ while True:
         for btn in active_buttons:
             btn['rect'] = pygame.Rect(cmd_card_start_x + (btn['col'] * 105), cmd_card_start_y + (btn['row'] * 60), 95, 50)
     
+        mods = pygame.key.get_mods()
+        shift_pressed_global = bool(mods & pygame.KMOD_SHIFT)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.VIDEORESIZE:
@@ -339,6 +368,8 @@ while True:
                         elif event.key == pygame.K_q: pending_command = 'BUILD_base'
                         elif event.key == pygame.K_t: pending_command = 'BUILD_tower'
                         elif event.key == pygame.K_o: pending_command = 'BUILD_obs_tower'
+                        elif event.key == pygame.K_l: pending_command = 'BUILD_torch'
+                        elif event.key == pygame.K_j: pending_command = 'BUILD_large_torch'
                         elif event.key == pygame.K_k:
                             if has_house: pending_command = 'BUILD_workshop'
                     elif worker_menu_state == 'ADV':
@@ -356,8 +387,7 @@ while True:
                     continue
 
                 if event.button == 1:
-                    mods = pygame.key.get_mods()
-                    shift_pressed = bool(mods & pygame.KMOD_SHIFT)
+                    shift_pressed = shift_pressed_global
                     
                     if minimap_rect.collidepoint(mouse_x, mouse_y) or mouse_y < TOP_BAR_HEIGHT: continue
                     elif mouse_y >= BOTTOM_UI_Y:
@@ -415,6 +445,7 @@ while True:
                             elif b_type == 'stonewall': b_type = 'stone_wall'
                             elif b_type == 'obstower': b_type = 'obs_tower'
                             elif b_type == 'doubletower': b_type = 'double_tower'
+                            elif b_type == 'largetorch': b_type = 'large_torch'
                             
                             st = BUILDING_STATS[b_type]
                             t_col, t_row = int(world_mouse_x // TILE_SIZE), int(world_mouse_y // TILE_SIZE)
@@ -468,8 +499,7 @@ while True:
                 
                 elif event.button == 3 and not is_paused: 
                     if TOP_BAR_HEIGHT <= mouse_y < BOTTOM_UI_Y:
-                        mods = pygame.key.get_mods()
-                        shift_pressed = bool(mods & pygame.KMOD_SHIFT)
+                        shift_pressed = shift_pressed_global
                         
                         pending_command = None
                         if selected_bases: selected_bases[0].rally_x, selected_bases[0].rally_y = world_mouse_x, world_mouse_y
@@ -507,6 +537,11 @@ while True:
                     rect = pygame.Rect(min(selection_start_world[0], world_mouse_x), min(selection_start_world[1], world_mouse_y), w, h)
                     for u in units:
                         if not u.is_hidden and rect.collidepoint(u.x, u.y): u.is_selected = True
+
+        if is_fullscreen and not is_paused:
+            pygame.event.set_grab(True)
+        else:
+            pygame.event.set_grab(False)
     
         if not is_paused:
             if mouse_x < SCROLL_MARGIN: camera_x -= CAMERA_SPEED
@@ -527,16 +562,12 @@ while True:
             if phase_name == "Noc":
                 if current_day == horde_day and hour == 20 and not horde_spawned:
                     show_message(f"Horda Zombie atakuje! ({horde_size} zainfekowanych)")
-                    for _ in range(horde_size):
-                        zx, zy = get_zombie_spawn_point(buildings, WORLD_WIDTH, WORLD_HEIGHT)
-                        if zx: zombies.append(Zombie(zx, zy))
+                    global_zombie_queue += horde_size
                     horde_spawned = True
                     
             if current_global_hour > 0 and current_global_hour % wave_interval_hours == 0 and current_global_hour > last_wave_spawn_hour_global:
                 show_message(f"Cykliczna fala zombie! ({wave_size} z zewnątrz)")
-                for _ in range(wave_size):
-                    zx, zy = get_zombie_spawn_point(buildings, WORLD_WIDTH, WORLD_HEIGHT)
-                    if zx: zombies.append(Zombie(zx, zy))
+                global_zombie_queue += wave_size
                 last_wave_spawn_hour_global = current_global_hour
 
             if global_message_timer > 0: global_message_timer -= 1
@@ -565,15 +596,28 @@ while True:
                 return False
 
             for b in buildings:
-                result = b.update(zombies, visual_effects, is_night, is_in_vision_check)
+                result = b.update(zombies, visual_effects, projectiles, is_night, is_in_vision_check)
                 if result == 'spawn_worker':
                     u = Unit(b.rect.centerx, b.rect.centery, 'worker'); u.issue_command(('MOVE', b.rally_x, b.rally_y), False, game_map, MAP_COLS, MAP_ROWS, buildings); units.append(u)
                 elif result == 'spawn_archer':
                     u = Unit(b.rect.centerx, b.rect.centery, 'archer'); u.issue_command(('MOVE', b.rally_x, b.rally_y), False, game_map, MAP_COLS, MAP_ROWS, buildings); units.append(u)
-                elif result == 'spawn_zombie': zombies.append(Zombie(b.rect.centerx, b.rect.centery + 40))
+                elif result == 'spawn_zombie':
+                    global_zombie_queue += 1
+                    
+            if global_zombie_queue > 0 and len(zombies) < MAX_ZOMBIES:
+                spawns_this_frame = min(3, global_zombie_queue, MAX_ZOMBIES - len(zombies))
+                for _ in range(spawns_this_frame):
+                    zx, zy = get_zombie_spawn_point(buildings, WORLD_WIDTH, WORLD_HEIGHT)
+                    if zx: 
+                        zombies.append(Zombie(zx, zy))
+                        global_zombie_queue -= 1
+                    else: break
         
-            for u in units: u.update(res, buildings, trees, crystals, stones, zombies, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS, units)
+            for u in units: u.update(res, buildings, trees, crystals, stones, zombies, is_obstacle, get_speed_mod, visual_effects, projectiles, game_map, MAP_COLS, MAP_ROWS, units)
             for z in zombies: z.update(units, buildings, is_obstacle, get_speed_mod, visual_effects, game_map, MAP_COLS, MAP_ROWS)
+            
+            for p in projectiles: p.update(zombies, visual_effects)
+            projectiles = [p for p in projectiles if p.active]
             
             for ef in visual_effects: ef['timer'] -= 1
             visual_effects = [ef for ef in visual_effects if ef['timer'] > 0]
@@ -623,29 +667,27 @@ while True:
         for b in buildings:
             if is_visible(b, camera_x, camera_y, v_width, v_height):
                 if b.b_type != 'cemetery' or is_in_vision_check(b.rect.centerx, b.rect.centery):
-                    b.draw(world_surface, camera_x, camera_y)
+                    b.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
                     
         for c in crystals:
             if is_visible(c, camera_x, camera_y, v_width, v_height):
-                cx, cy = int(c.x - camera_x), int(c.y - camera_y)
-                pygame.draw.circle(world_surface, c.color, (cx, cy), c.radius); c.draw_hp(world_surface, camera_x, camera_y)
-                if c.is_selected: pygame.draw.circle(world_surface, WHITE, (cx, cy), c.radius + 2, 1)
+                c.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
         for s in stones:
             if is_visible(s, camera_x, camera_y, v_width, v_height):
-                cx, cy = int(s.x - camera_x), int(s.y - camera_y)
-                pygame.draw.circle(world_surface, s.color, (cx, cy), s.radius); s.draw_hp(world_surface, camera_x, camera_y)
-                if s.is_selected: pygame.draw.circle(world_surface, WHITE, (cx, cy), s.radius + 2, 1)
+                s.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
         for t in trees:
             if is_visible(t, camera_x, camera_y, v_width, v_height):
-                tx, ty = int(t.x - camera_x), int(t.y - camera_y)
-                pygame.draw.circle(world_surface, t.color, (tx, ty), t.radius); t.draw_hp(world_surface, camera_x, camera_y)
-                if t.is_selected: pygame.draw.circle(world_surface, WHITE, (tx, ty), t.radius + 2, 1)
+                t.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
         for u in units:
-            if not u.is_hidden and is_visible(u, camera_x, camera_y, v_width, v_height): u.draw(world_surface, camera_x, camera_y)
+            if not u.is_hidden and is_visible(u, camera_x, camera_y, v_width, v_height): u.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
         
         for z in zombies:
             if is_visible(z, camera_x, camera_y, v_width, v_height) and is_in_vision_check(z.x, z.y): 
-                z.draw(world_surface, camera_x, camera_y)
+                z.draw(world_surface, camera_x, camera_y, LOADED_IMAGES)
+                
+        for p in projectiles:
+            if camera_x - 50 < p.x < camera_x + v_width + 50 and camera_y - 50 < p.y < camera_y + v_height + 50:
+                p.draw(world_surface, camera_x, camera_y)
             
         for ef in visual_effects:
             if ef.get('type') == 'circle':
@@ -654,6 +696,18 @@ while True:
                 x1, y1 = ef.get('x1', 0), ef.get('y1', 0)
                 x2, y2 = ef.get('x2', 0), ef.get('y2', 0)
                 pygame.draw.line(world_surface, ef['color'], (x1 - camera_x, y1 - camera_y), (x2 - camera_x, y2 - camera_y), 2)
+    
+        if shift_pressed_global:
+            for u in units:
+                if u.is_selected and not u.is_hidden:
+                    pts = [(u.x - camera_x, u.y - camera_y)]
+                    if u.state in ['MOVE', 'HARVEST', 'ATTACK', 'BUILD', 'REPAIR', 'SEARCH_MOVE', 'GARRISON']:
+                        pts.append((u.target_x - camera_x, u.target_y - camera_y))
+                    for cmd in u.command_queue:
+                        if cmd[0] == 'MOVE': pts.append((cmd[1] - camera_x, cmd[2] - camera_y))
+                        elif hasattr(cmd[1], 'x'): pts.append((cmd[1].x - camera_x, cmd[1].y - camera_y))
+                    if len(pts) > 1:
+                        pygame.draw.lines(world_surface, (0, 255, 0, 100), False, pts, 2)
     
         if is_selecting:
             pygame.draw.rect(world_surface, GREEN, (min(selection_start_world[0], world_mouse_x) - camera_x, 
@@ -675,6 +729,7 @@ while True:
             elif b_type == 'stonewall': b_type = 'stone_wall'
             elif b_type == 'obstower': b_type = 'obs_tower'
             elif b_type == 'doubletower': b_type = 'double_tower'
+            elif b_type == 'largetorch': b_type = 'large_torch'
             
             st = BUILDING_STATS[b_type]
             t_col, t_row = int(world_mouse_x // TILE_SIZE), int(world_mouse_y // TILE_SIZE)
@@ -693,6 +748,41 @@ while True:
             pygame.draw.rect(s, (255, 255, 255, 150), (0, 0, st['w_tiles'] * TILE_SIZE, st['h_tiles'] * TILE_SIZE), 2)
             world_surface.blit(s, (t_col * TILE_SIZE - camera_x, t_row * TILE_SIZE - camera_y))
     
+        night_alpha = 0
+        if 18 <= hour < 20: night_alpha = int(((hour - 18) * 60 + minutes) / 120 * 160)
+        elif 20 <= hour or hour < 4: night_alpha = 160
+        elif 4 <= hour < 6: night_alpha = 160 - int(((hour - 4) * 60 + minutes) / 120 * 160)
+            
+        if night_alpha > 0:
+            night_overlay = pygame.Surface((v_width, v_height), pygame.SRCALPHA)
+            night_overlay.fill((0, 0, 15, night_alpha))
+            
+            for b in buildings:
+                if b.is_built and b.b_type in ['torch', 'large_torch'] and is_in_vision_check(b.rect.centerx, b.rect.centery):
+                    glow_rad = 150 if b.b_type == 'torch' else 250
+                    hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
+                    
+                    steps = 4
+                    for step in range(steps, 0, -1):
+                        r = int(glow_rad * (step / steps))
+                        a = int(night_alpha / steps)
+                        pygame.draw.circle(hole_surf, (0, 0, 0, a), (glow_rad, glow_rad), r)
+                    
+                    night_overlay.blit(hole_surf, (b.rect.centerx - camera_x - glow_rad, b.rect.centery - camera_y - glow_rad), special_flags=pygame.BLEND_RGBA_SUB)
+                    
+            for u in units:
+                if not u.is_hidden and u.u_type == 'worker':
+                    glow_rad = 80
+                    hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
+                    steps = 3
+                    for step in range(steps, 0, -1):
+                        r = int(glow_rad * (step / steps))
+                        a = int(night_alpha / steps)
+                        pygame.draw.circle(hole_surf, (0, 0, 0, a), (glow_rad, glow_rad), r)
+                    night_overlay.blit(hole_surf, (u.x - camera_x - glow_rad, u.y - camera_y - glow_rad), special_flags=pygame.BLEND_RGBA_SUB)
+            
+            world_surface.blit(night_overlay, (0, 0))
+    
         world_surface.blit(fog_surface, (0, 0))
     
         scaled_world = pygame.transform.scale(world_surface, (WIDTH, VIEW_HEIGHT))
@@ -706,7 +796,7 @@ while True:
         draw_resource_icon(screen, WIDTH - 520, 15, 'wood'); screen.blit(font_main.render(str(res['wood']), True, WHITE), (WIDTH - 505, 5))
         draw_resource_icon(screen, WIDTH - 400, 15, 'stone'); screen.blit(font_main.render(str(res['stone']), True, WHITE), (WIDTH - 385, 5))
         draw_resource_icon(screen, WIDTH - 280, 15, 'crystal'); screen.blit(font_main.render(str(res['crystals']), True, WHITE), (WIDTH - 265, 5))
-        screen.blit(font_main.render(f"Pop: {current_pop}/{max_pop}", True, RED if current_pop >= max_pop else WHITE), (WIDTH - 150, 5))
+        screen.blit(font_main.render(f"Pop: {current_pop}/{max_pop} | Kolejka Zombie: {global_zombie_queue}", True, RED if current_pop >= max_pop else WHITE), (WIDTH - 150, 5))
     
         pygame.draw.rect(screen, DARK_GRAY, (0, BOTTOM_UI_Y, WIDTH, UI_HEIGHT))
         pygame.draw.line(screen, UI_BORDER, (0, BOTTOM_UI_Y), (WIDTH, BOTTOM_UI_Y), 4)

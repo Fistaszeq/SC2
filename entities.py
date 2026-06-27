@@ -1,4 +1,3 @@
-
 import math
 import random
 import pygame
@@ -11,6 +10,56 @@ def draw_hp_bar(surface, x, y, hp, max_hp, width=30):
         pygame.draw.rect(surface, RED, (bx, by, width, 4))
         pygame.draw.rect(surface, GREEN, (bx, by, int(width * (max(0, hp) / max_hp)), 4))
 
+class Projectile:
+    def __init__(self, x, y, target, damage, p_type, aoe_radius=0, inaccuracy=0):
+        self.x, self.y = x, y
+        self.target = target
+        self.damage = damage
+        self.p_type = p_type
+        self.aoe_radius = aoe_radius
+        
+        self.speed = 16 if p_type == 'laser' else (8 if p_type == 'arrow' else 4)
+        self.color = YELLOW if p_type == 'laser' else WHITE if p_type == 'arrow' else (200, 100, 0)
+        self.radius = 2 if p_type == 'laser' else (4 if p_type == 'arrow' else 8)
+        self.active = True
+        
+        self.tx = getattr(target, 'x', target[0] if isinstance(target, tuple) else self.x)
+        self.ty = getattr(target, 'y', target[1] if isinstance(target, tuple) else self.y)
+        
+        if inaccuracy > 0:
+            self.tx += random.randint(-inaccuracy, inaccuracy)
+            self.ty += random.randint(-inaccuracy, inaccuracy)
+
+    def update(self, enemies_list, effects_list):
+        if not self.active: return
+        
+        dx, dy = self.tx - self.x, self.ty - self.y
+        dist = math.hypot(dx, dy)
+        
+        if dist <= self.speed:
+            self.active = False
+            if self.p_type == 'artillery':
+                for e in enemies_list:
+                    if math.hypot(e.x - self.tx, e.y - self.ty) <= self.aoe_radius: e.hp -= self.damage
+                effects_list.append({'type': 'circle', 'x': self.tx, 'y': self.ty, 'radius': self.aoe_radius, 'timer': 15, 'color': ORANGE})
+                effects_list.append({'type': 'circle', 'x': self.tx, 'y': self.ty, 'radius': self.aoe_radius//2, 'timer': 8, 'color': YELLOW})
+            else:
+                if hasattr(self.target, 'hp') and self.target.hp > 0:
+                    if math.hypot(self.target.x - self.tx, self.target.y - self.ty) <= getattr(self.target, 'radius', 10) + 15:
+                        self.target.hp -= self.damage
+        else:
+            self.x += (dx/dist) * self.speed
+            self.y += (dy/dist) * self.speed
+
+    def draw(self, surface, cam_x, cam_y):
+        if not self.active: return
+        if self.p_type == 'laser':
+            ox = self.x - (self.tx - self.x)/max(1, math.hypot(self.tx - self.x, self.ty - self.y)) * 12
+            oy = self.y - (self.ty - self.y)/max(1, math.hypot(self.tx - self.x, self.ty - self.y)) * 12
+            pygame.draw.line(surface, self.color, (int(ox - cam_x), int(oy - cam_y)), (int(self.x - cam_x), int(self.y - cam_y)), self.radius)
+        else:
+            pygame.draw.circle(surface, self.color, (int(self.x - cam_x), int(self.y - cam_y)), self.radius)
+
 class Tree:
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -20,8 +69,15 @@ class Tree:
         self.max_workers = max(1, self.radius // 6) 
         self.is_selected, self.type, self.title = False, 'wood', "Złoże Drewna"
         self.color = (random.randint(20, 40), random.randint(100, 150), random.randint(20, 40))
-    def draw_hp(self, surface, cam_x, cam_y):
-        if self.hp < self.max_hp: draw_hp_bar(surface, int(self.x - cam_x), int(self.y - cam_y), self.hp, self.max_hp)
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
+        cx, cy = int(self.x - cam_x), int(self.y - cam_y)
+        if loaded_images and 'wood' in loaded_images:
+            img = loaded_images['wood']
+            surface.blit(img, (cx - img.get_width()//2, cy - img.get_height()//2))
+        else:
+            pygame.draw.circle(surface, self.color, (cx, cy), self.radius)
+        if self.is_selected: pygame.draw.circle(surface, WHITE, (cx, cy), self.radius + 2, 1)
+        if self.hp < self.max_hp: draw_hp_bar(surface, cx, cy, self.hp, self.max_hp)
 
 class Crystal:
     def __init__(self, x, y):
@@ -32,8 +88,15 @@ class Crystal:
         self.max_workers = max(1, self.radius // 5) 
         self.is_selected, self.type, self.title = False, 'crystal', "Złoże Kryształów"
         self.color = CYAN
-    def draw_hp(self, surface, cam_x, cam_y):
-        if self.hp < self.max_hp: draw_hp_bar(surface, int(self.x - cam_x), int(self.y - cam_y), self.hp, self.max_hp)
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
+        cx, cy = int(self.x - cam_x), int(self.y - cam_y)
+        if loaded_images and 'crystal' in loaded_images:
+            img = loaded_images['crystal']
+            surface.blit(img, (cx - img.get_width()//2, cy - img.get_height()//2))
+        else:
+            pygame.draw.circle(surface, self.color, (cx, cy), self.radius)
+        if self.is_selected: pygame.draw.circle(surface, WHITE, (cx, cy), self.radius + 2, 1)
+        if self.hp < self.max_hp: draw_hp_bar(surface, cx, cy, self.hp, self.max_hp)
 
 class Stone:
     def __init__(self, x, y):
@@ -44,8 +107,15 @@ class Stone:
         self.max_workers = max(1, self.radius // 5) 
         self.is_selected, self.type, self.title = False, 'stone', "Złoże Kamienia"
         self.color = (140, 140, 140)
-    def draw_hp(self, surface, cam_x, cam_y):
-        if self.hp < self.max_hp: draw_hp_bar(surface, int(self.x - cam_x), int(self.y - cam_y), self.hp, self.max_hp)
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
+        cx, cy = int(self.x - cam_x), int(self.y - cam_y)
+        if loaded_images and 'stone' in loaded_images:
+            img = loaded_images['stone']
+            surface.blit(img, (cx - img.get_width()//2, cy - img.get_height()//2))
+        else:
+            pygame.draw.circle(surface, self.color, (cx, cy), self.radius)
+        if self.is_selected: pygame.draw.circle(surface, WHITE, (cx, cy), self.radius + 2, 1)
+        if self.hp < self.max_hp: draw_hp_bar(surface, cx, cy, self.hp, self.max_hp)
 
 def get_available_resource(unit, res_list, all_units):
     counts = {r: 0 for r in res_list}
@@ -90,6 +160,8 @@ class Building:
         if b_type == 'tower': self.vision_range, self.damage, self.attack_cooldown = 300, 15, 60
         elif b_type == 'double_tower': self.vision_range, self.damage, self.attack_cooldown = 350, 20, 40
         elif b_type == 'obs_tower': self.vision_range = 250
+        elif b_type == 'torch': self.vision_range = 250
+        elif b_type == 'large_torch': self.vision_range = 350
         elif b_type == 'artillery':
             self.vision_range = 200
             self.attack_range = 1000
@@ -98,7 +170,7 @@ class Building:
             self.aoe_radius = 120
         elif b_type == 'cemetery': self.is_built, self.hp = True, self.max_hp
 
-    def update(self, enemies_list, effects_list, is_night=False, is_in_vision_fn=None):
+    def update(self, enemies_list, effects_list, projectiles_list, is_night=False, is_in_vision_fn=None):
         if not self.is_built:
             self.hp = max(1, int(self.max_hp * (self.build_progress / max(1, self.build_max))))
             if self.build_progress >= self.build_max: self.is_built = True
@@ -108,17 +180,21 @@ class Building:
                     self.vision_range = 600
                     archers = [u for u in self.garrisoned_units if u.u_type == 'archer']
                     if archers:
-                        if self.attack_timer > 0: self.attack_timer -= 1
-                        elif enemies_list:
-                            target, min_d = None, 600 * 600
+                        target, min_d = None, 600 * 600
+                        if enemies_list:
                             for e in enemies_list:
                                 d_sq = (e.x - self.x)**2 + (e.y - self.y)**2
                                 if d_sq <= min_d: target, min_d = e, d_sq
-                            if target:
-                                dmg = sum(a.damage for a in archers) * 1.5
-                                target.hp -= dmg
-                                effects_list.append({'type': 'line', 'x1': self.x, 'y1': self.y - 20, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': WHITE})
-                                self.attack_timer = archers[0].attack_cooldown 
+                        
+                        if target:
+                            for archer in archers:
+                                if archer.attack_timer <= 0:
+                                    dmg = archer.damage * 1.5
+                                    projectiles_list.append(Projectile(self.x, self.y - 20, target, dmg, 'arrow', inaccuracy=15))
+                                    archer.attack_timer = archer.attack_cooldown 
+                        
+                        for archer in archers:
+                            if archer.attack_timer > 0: archer.attack_timer -= 1
                 else: self.vision_range = 250
                 
             elif self.b_type == 'artillery':
@@ -133,10 +209,7 @@ class Building:
                                     target, min_d = e, d_sq
                         if target:
                             self.turret_angle = math.atan2(target.y - self.y, target.x - self.x)
-                            for e in enemies_list:
-                                if (e.x - target.x)**2 + (e.y - target.y)**2 <= self.aoe_radius**2: e.hp -= self.damage
-                            effects_list.append({'type': 'line', 'x1': self.x, 'y1': self.y, 'x2': target.x, 'y2': target.y, 'timer': 10, 'color': ORANGE})
-                            effects_list.append({'type': 'circle', 'x': target.x, 'y': target.y, 'radius': self.aoe_radius, 'timer': 15, 'color': ORANGE})
+                            projectiles_list.append(Projectile(self.x, self.y, target, self.damage, 'artillery', self.aoe_radius, inaccuracy=45))
                             self.attack_timer = self.attack_cooldown
 
             if self.b_type in ['base', 'barracks']:
@@ -158,13 +231,12 @@ class Building:
                 if target:
                     self.turret_angle = math.atan2(target.y - self.y, target.x - self.x)
                     if self.attack_timer <= 0:
-                        target.hp -= self.damage
                         if self.b_type == 'double_tower':
                             ox, oy = math.cos(self.turret_angle + 1.57)*5, math.sin(self.turret_angle + 1.57)*5
-                            effects_list.append({'type': 'line', 'x1': self.x+ox, 'y1': self.y+oy, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': YELLOW})
-                            effects_list.append({'type': 'line', 'x1': self.x-ox, 'y1': self.y-oy, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': YELLOW})
+                            projectiles_list.append(Projectile(self.x+ox, self.y+oy, target, self.damage, 'laser', inaccuracy=10))
+                            projectiles_list.append(Projectile(self.x-ox, self.y-oy, target, self.damage, 'laser', inaccuracy=10))
                         else:
-                            effects_list.append({'type': 'line', 'x1': self.x, 'y1': self.y, 'x2': target.x, 'y2': target.y, 'timer': 8, 'color': YELLOW})
+                            projectiles_list.append(Projectile(self.x, self.y, target, self.damage, 'laser', inaccuracy=10))
                         self.attack_timer = self.attack_cooldown 
                             
             if self.b_type == 'cemetery':
@@ -176,18 +248,29 @@ class Building:
                 else: self.spawn_timer = 0
         return None
 
-    def draw(self, surface, cam_x, cam_y):
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
         draw_rect = self.rect.move(-cam_x, -cam_y)
         cx, cy = draw_rect.centerx, draw_rect.centery
         
         if not self.is_built:
             pygame.draw.rect(surface, (150, 100, 0), draw_rect, 2)
             pygame.draw.rect(surface, GREEN, (draw_rect.x, draw_rect.y - 15, int(draw_rect.width * (self.build_progress / max(1, self.build_max))), 6))
+            draw_hp_bar(surface, cx, cy, self.hp, self.max_hp)
+            return
+
+        if loaded_images and self.b_type in loaded_images:
+            img = loaded_images[self.b_type]
+            surface.blit(img, (draw_rect.x, draw_rect.y))
         else:
             pygame.draw.rect(surface, self.color, draw_rect)
-            
             if self.b_type == 'cemetery': pygame.draw.rect(surface, (20, 20, 20), (cx - 10, cy - 20, 20, 40)) 
             elif self.b_type == 'workshop': pygame.draw.circle(surface, DARK_GRAY, (cx, cy), 15)
+            elif self.b_type == 'torch':
+                pygame.draw.circle(surface, (139, 69, 19), (cx, cy), 8)
+                pygame.draw.circle(surface, (255, 100, 0), (cx, cy), 4)
+            elif self.b_type == 'large_torch':
+                pygame.draw.circle(surface, (100, 50, 10), (cx, cy), 14)
+                pygame.draw.circle(surface, (255, 120, 0), (cx, cy), 8)
             elif self.b_type == 'obs_tower':
                 pygame.draw.circle(surface, (50, 50, 50), (cx, cy), 15)
                 offsets = [(-8, -8), (8, -8), (-8, 8), (8, 8)]
@@ -219,12 +302,12 @@ class Building:
                 pygame.draw.line(surface, BLACK, (cx+ox, cy+oy), (cx+ox+dx, cy+oy+dy), 3)
                 pygame.draw.line(surface, BLACK, (cx-ox, cy-oy), (cx-ox+dx, cy-oy+dy), 3)
                 
-            if self.b_type in ['tower', 'double_tower', 'obs_tower', 'artillery'] and self.is_selected:
-                vr = self.vision_range
-                if self.b_type == 'obs_tower' and any(u.u_type == 'archer' for u in self.garrisoned_units): vr = 450
-                s = pygame.Surface((vr*2, vr*2), pygame.SRCALPHA)
-                pygame.draw.circle(s, (255, 0, 0, 50) if self.b_type != 'obs_tower' else (0, 255, 0, 50), (vr, vr), vr)
-                surface.blit(s, (cx - vr, cy - vr))
+        if self.b_type in ['tower', 'double_tower', 'obs_tower', 'artillery'] and self.is_selected:
+            vr = self.vision_range
+            if self.b_type == 'obs_tower' and any(u.u_type == 'archer' for u in self.garrisoned_units): vr = 450
+            s = pygame.Surface((vr*2, vr*2), pygame.SRCALPHA)
+            pygame.draw.circle(s, (255, 0, 0, 50) if self.b_type != 'obs_tower' else (0, 255, 0, 50), (vr, vr), vr)
+            surface.blit(s, (cx - vr, cy - vr))
                 
         if self.is_selected: pygame.draw.rect(surface, WHITE, draw_rect, 2)
         
@@ -325,7 +408,7 @@ class Unit:
             if not is_obstacle_fn(self.x + (dx/dist)*s, self.y): self.x += (dx/dist)*s
             if not is_obstacle_fn(self.x, self.y + (dy/dist)*s): self.y += (dy/dist)*s
 
-    def update(self, res_dict, buildings_list, trees_list, crystals_list, stones_list, enemies_list, is_obstacle_fn, get_speed_mod, effects_list, game_map, MAP_COLS, MAP_ROWS, all_units):
+    def update(self, res_dict, buildings_list, trees_list, crystals_list, stones_list, enemies_list, is_obstacle_fn, get_speed_mod, effects_list, projectiles_list, game_map, MAP_COLS, MAP_ROWS, all_units):
         if self.is_hidden:
             if self.state == 'GARRISON':
                 if not self.building_ref or getattr(self.building_ref, 'hp', 0) <= 0:
@@ -350,7 +433,7 @@ class Unit:
         closest_base = self.get_closest_base(buildings_list)
 
         if self.carry_amount > 0 and closest_base:
-            if (closest_base.x - self.x)**2 + (closest_base.y - self.y)**2 <= (closest_base.radius + self.radius + 80)**2: # Powiększony dystans drop-off
+            if (closest_base.x - self.x)**2 + (closest_base.y - self.y)**2 <= (closest_base.radius + self.radius + 80)**2: 
                 if self.carry_type == 'wood': res_dict['wood'] += self.carry_amount
                 elif self.carry_type == 'crystal': res_dict['crystals'] += self.carry_amount
                 elif self.carry_type == 'stone': res_dict['stone'] += self.carry_amount
@@ -370,9 +453,9 @@ class Unit:
                 if d_sq < min_d_sq: target, min_d_sq = e, d_sq
             if target: 
                 self.issue_command(('ATTACK', target), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
-            elif self.u_type == 'worker':
+            elif self.u_type == 'worker' and not self.is_selected:
                 best_res = get_available_resource(self, trees_list + crystals_list + stones_list, all_units)
-                if best_res and ((best_res.x - self.x)**2 + (best_res.y - self.y)**2) < (self.radius + 60)**2:
+                if best_res and ((best_res.x - self.x)**2 + (best_res.y - self.y)**2) < (150)**2:
                     self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'MOVE':
@@ -390,10 +473,12 @@ class Unit:
             else:
                 self.path = [] 
                 if self.attack_timer <= 0:
-                    self.target_obj.hp -= self.damage
+                    if self.attack_range > 50:
+                        projectiles_list.append(Projectile(self.x, self.y, self.target_obj, self.damage, 'arrow', inaccuracy=15))
+                    else:
+                        self.target_obj.hp -= self.damage
+                        if hasattr(self.target_obj, 'amount'): self.target_obj.amount = max(0, self.target_obj.amount - self.damage)
                     self.attack_timer = self.attack_cooldown
-                    if self.attack_range > 50: effects_list.append({'type': 'line', 'x1': self.x, 'y1': self.y, 'x2': self.target_obj.x, 'y2': self.target_obj.y, 'timer': 8, 'color': WHITE})
-                    if hasattr(self.target_obj, 'amount'): self.target_obj.amount = max(0, self.target_obj.amount - self.damage)
 
         elif self.state == 'BUILD':
             if getattr(self.target_obj, 'hp', 0) <= 0:
@@ -426,6 +511,7 @@ class Unit:
                 if len(getattr(self.target_obj, 'garrisoned_units', [])) < getattr(self.target_obj, 'max_garrison', 0):
                     if self not in self.target_obj.garrisoned_units:
                         self.is_hidden = True
+                        self.attack_timer = len(self.target_obj.garrisoned_units) * 12 
                         self.target_obj.garrisoned_units.append(self)
                         self.building_ref = self.target_obj
                 else: 
@@ -436,7 +522,8 @@ class Unit:
             if not self.target_obj or self.target_obj.amount <= 0: 
                 self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
-            if dist > self.target_obj.radius + self.radius + 25:
+            if dist > self.target_obj.radius + self.radius + 10:
+                if not self.path: self.calculate_path(self.target_obj.x, self.target_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
                 self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
             else:
                 self.path = []
@@ -461,11 +548,17 @@ class Unit:
                 if best_res: self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
                 else: self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
-    def draw(self, surface, cam_x, cam_y):
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
         if self.is_hidden: return 
         sx, sy = int(self.x - cam_x), int(self.y - cam_y)
-        col = YELLOW if self.carry_type == 'wood' else CYAN if self.carry_type == 'crystal' else (150, 150, 150) if self.carry_type == 'stone' else self.color
-        pygame.draw.circle(surface, col, (sx, sy), self.radius)
+        
+        if loaded_images and self.u_type in loaded_images:
+            img = loaded_images[self.u_type]
+            surface.blit(img, (sx - img.get_width()//2, sy - img.get_height()//2))
+        else:
+            col = YELLOW if self.carry_type == 'wood' else CYAN if self.carry_type == 'crystal' else (150, 150, 150) if self.carry_type == 'stone' else self.color
+            pygame.draw.circle(surface, col, (sx, sy), self.radius)
+            
         if self.is_selected: pygame.draw.circle(surface, GREEN, (sx, sy), self.radius + 2, 2)
         draw_hp_bar(surface, sx, sy, self.hp, self.max_hp)
 
@@ -517,9 +610,13 @@ class Zombie:
                     target.hp -= self.damage
                     self.attack_timer = self.attack_cooldown
 
-    def draw(self, surface, cam_x, cam_y):
+    def draw(self, surface, cam_x, cam_y, loaded_images=None):
         sx, sy = int(self.x - cam_x), int(self.y - cam_y)
-        pygame.draw.circle(surface, self.color, (sx, sy), self.radius)
+        if loaded_images and 'zombie' in loaded_images:
+            img = loaded_images['zombie']
+            surface.blit(img, (sx - img.get_width()//2, sy - img.get_height()//2))
+        else:
+            pygame.draw.circle(surface, self.color, (sx, sy), self.radius)
         if self.is_selected: pygame.draw.circle(surface, RED, (sx, sy), self.radius + 2, 2)
         draw_hp_bar(surface, sx, sy, self.hp, self.max_hp)
 
