@@ -1,7 +1,5 @@
 
 
-? W fullscreen zablokować kursor.
-
 ? Limi zombie.
 ? Stakowanie się zmobie które się nie zrespiły.
 - Interfejs do prawej strony mocno a na środku staty.
