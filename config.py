@@ -23,7 +23,7 @@ WATER_COLOR = (41, 128, 185)
 DAY_LENGTH_FRAMES = 14000
 
 IMAGE_PATHS = {
-    'worker': '',
+    'worker': 'icon.png',
     'archer': '',
     'zombie': '',
     'house': '',

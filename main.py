@@ -1,7 +1,15 @@
 import pygame, math, random, json, os
 from config import *
+
+# 1. Najpierw inicjalizacja głównych modułów
 pygame.init()
 
+# 2. Utworzenie okna gry (Display Surface) - WYMAGANE przed convert_alpha()
+WIDTH, HEIGHT = 1024, 768
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+pygame.display.set_caption("RTS - Prawdziwa Mgła Wojny, Nowe Wieżyczki i UI SC2")
+
+# 3. DOPIERO TERAZ wczytywanie zasobów graficznych do pamięci globalnej
 LOADED_IMAGES = {}
 for key, path in IMAGE_PATHS.items():
     if path and path.strip() != "" and os.path.exists(path):
@@ -20,11 +28,16 @@ for key, path in IMAGE_PATHS.items():
         except Exception as e:
             print(f"Błąd ładowania grafiki {path}: {e}")
 
-WIDTH, HEIGHT = 1024, 768
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
-pygame.display.set_caption("RTS - Prawdziwa Mgła Wojny, Nowe Wieżyczki i UI SC2")
-
 from entities import *
+
+font_main = pygame.font.SysFont(None, 24)
+font_small = pygame.font.SysFont(None, 18)
+font_bold = pygame.font.SysFont(None, 24, bold=True)
+font_info_title = pygame.font.SysFont(None, 28, bold=True)
+font_title = pygame.font.SysFont(None, 64, bold=True)
+
+# ... tutaj zaczyna się dalsza część oryginalnego kodu pliku main.py ...
+# global_message, global_message_timer = "", 0
 
 font_main = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 18)
