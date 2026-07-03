@@ -22,13 +22,17 @@ WATER_COLOR = (41, 128, 185)
 
 DAY_LENGTH_FRAMES = 14000
 
+# Słownik do podmieniania obiektów na własne grafiki (ścieżki do obrazów).
+# Załączono dedykowane kafelki wygładzające piasek.
 IMAGE_PATHS = {
-    'worker': 'icon.png',
+    'worker': '',
     'archer': '',
     'zombie': '',
     'house': '',
     'wood_wall': '',
     'stone_wall': '',
+    'torch': '',
+    'large_torch': '',
     'tower': '',
     'double_tower': '',
     'obs_tower': '',
@@ -37,11 +41,23 @@ IMAGE_PATHS = {
     'workshop': '',
     'barracks': '',
     'cemetery': '',
-    'torch': '',
-    'large_torch': '',
     'wood': '',
     'crystal': '',
-    'stone': ''
+    'stone': 'medium_stone-1.png.png',
+    
+    # Tereny
+    'bg_grass': 'img/grass64.png',
+    'bg_dirt': 'img/sand64.png',
+    'bg_dirt_t':  'img/grass64.png',
+    'bg_dirt_b':  'img/grass64.png',
+    'bg_dirt_l':  'img/grass64.png',
+    'bg_dirt_r':  'img/grass64.png',
+    'bg_dirt_tl': 'img/grass64.png',
+    'bg_dirt_tr': 'img/grass64.png',
+    'bg_dirt_bl': 'img/grass64.png',
+    'bg_dirt_br': 'img/grass64.png',
+    'bg_water': '',
+    'bg_rock': ''
 }
 
 UNIT_STATS = {

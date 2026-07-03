@@ -13,12 +13,13 @@ def draw_hp_bar(surface, x, y, hp, max_hp, width=30):
 class Projectile:
     def __init__(self, x, y, target, damage, p_type, aoe_radius=0, inaccuracy=0):
         self.x, self.y = x, y
+        self.start_x, self.start_y = x, y
         self.target = target
         self.damage = damage
         self.p_type = p_type
         self.aoe_radius = aoe_radius
         
-        self.speed = 16 if p_type == 'laser' else (8 if p_type == 'arrow' else 4)
+        self.speed = 16 if p_type == 'laser' else (8 if p_type == 'arrow' else 5)
         self.color = YELLOW if p_type == 'laser' else WHITE if p_type == 'arrow' else (200, 100, 0)
         self.radius = 2 if p_type == 'laser' else (4 if p_type == 'arrow' else 8)
         self.active = True
@@ -29,6 +30,8 @@ class Projectile:
         if inaccuracy > 0:
             self.tx += random.randint(-inaccuracy, inaccuracy)
             self.ty += random.randint(-inaccuracy, inaccuracy)
+            
+        self.total_dist = math.hypot(self.tx - self.x, self.ty - self.y)
 
     def update(self, enemies_list, effects_list):
         if not self.active: return
@@ -57,6 +60,11 @@ class Projectile:
             ox = self.x - (self.tx - self.x)/max(1, math.hypot(self.tx - self.x, self.ty - self.y)) * 12
             oy = self.y - (self.ty - self.y)/max(1, math.hypot(self.tx - self.x, self.ty - self.y)) * 12
             pygame.draw.line(surface, self.color, (int(ox - cam_x), int(oy - cam_y)), (int(self.x - cam_x), int(self.y - cam_y)), self.radius)
+        elif self.p_type == 'artillery':
+            curr_dist = math.hypot(self.tx - self.x, self.ty - self.y)
+            progress = 1.0 - (curr_dist / max(1, self.total_dist))
+            arc_height = math.sin(progress * math.pi) * 120 
+            pygame.draw.circle(surface, self.color, (int(self.x - cam_x), int(self.y - cam_y - arc_height)), self.radius)
         else:
             pygame.draw.circle(surface, self.color, (int(self.x - cam_x), int(self.y - cam_y)), self.radius)
 
@@ -326,6 +334,7 @@ class Unit:
         self.carry_type, self.carry_amount, self.harvest_timer = None, 0, 0
         self.last_harvest_x, self.last_harvest_y, self.search_type = x, y, None
         
+        self.manual_mode = False 
         self.path = [] 
         self.command_queue = []
         self.is_hidden, self.building_ref = False, None
@@ -353,10 +362,13 @@ class Unit:
         cmd_type = cmd_tuple[0]
         self.is_hidden = False
         self.building_ref = None
+        self.manual_mode = True 
+        
         if cmd_type == 'MOVE':
             self.state, self.target_obj = 'MOVE', None
             self.calculate_path(cmd_tuple[1], cmd_tuple[2], game_map, MAP_COLS, MAP_ROWS, buildings_list)
         elif cmd_type == 'HARVEST':
+            self.manual_mode = False 
             self.state, self.target_obj = 'HARVEST', cmd_tuple[1]
             self.calculate_path(cmd_tuple[1].x, cmd_tuple[1].y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
         elif cmd_type == 'ATTACK':
@@ -381,6 +393,7 @@ class Unit:
 
     def command_stop(self): 
         self.command_queue.clear()
+        self.manual_mode = True 
         self.state, self.target_obj, self.target_x, self.target_y, self.path, self.is_hidden, self.building_ref = 'IDLE', None, self.x, self.y, [], False, None
 
     def get_closest_base(self, buildings_list):
@@ -447,16 +460,23 @@ class Unit:
                         self.calculate_path(self.last_harvest_x, self.last_harvest_y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         if self.state == 'IDLE':
-            target, min_d_sq = None, self.vision_range * self.vision_range
-            for e in enemies_list:
-                d_sq = (e.x - self.x)**2 + (e.y - self.y)**2
-                if d_sq < min_d_sq: target, min_d_sq = e, d_sq
-            if target: 
-                self.issue_command(('ATTACK', target), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
-            elif self.u_type == 'worker' and not self.is_selected:
-                best_res = get_available_resource(self, trees_list + crystals_list + stones_list, all_units)
-                if best_res and ((best_res.x - self.x)**2 + (best_res.y - self.y)**2) < (150)**2:
-                    self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+            if self.u_type != 'worker':
+                target, min_d_sq = None, self.vision_range * self.vision_range
+                for e in enemies_list:
+                    d_sq = (e.x - self.x)**2 + (e.y - self.y)**2
+                    if d_sq < min_d_sq: target, min_d_sq = e, d_sq
+                if target: 
+                    self.issue_command(('ATTACK', target), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+            else:
+                if not self.is_selected and not self.manual_mode:
+                    damaged_b = [b for b in buildings_list if getattr(b, 'hp', 0) < getattr(b, 'max_hp', 1) and b.is_built]
+                    if damaged_b:
+                        closest_b = min(damaged_b, key=lambda b: (b.x - self.x)**2 + (b.y - self.y)**2)
+                        self.issue_command(('REPAIR', closest_b), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                    else:
+                        best_res = get_available_resource(self, trees_list + crystals_list + stones_list, all_units)
+                        if best_res and ((best_res.x - self.x)**2 + (best_res.y - self.y)**2) < (400)**2:
+                            self.issue_command(('HARVEST', best_res), False, game_map, MAP_COLS, MAP_ROWS, buildings_list)
 
         elif self.state == 'MOVE':
             self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
@@ -467,7 +487,7 @@ class Unit:
             if not self.target_obj or getattr(self.target_obj, 'hp', 0) <= 0: 
                 self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list); return
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
-            if dist > self.attack_range + self.target_obj.radius:
+            if dist > self.attack_range + getattr(self.target_obj, 'radius', 10):
                 if not self.path and random.random() < 0.05: self.calculate_path(self.target_obj.x, self.target_obj.y, game_map, MAP_COLS, MAP_ROWS, buildings_list)
                 self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
             else:
@@ -498,9 +518,13 @@ class Unit:
             dist = math.hypot(self.target_obj.x - self.x, self.target_obj.y - self.y)
             if dist < self.target_obj.radius + self.radius + 25:
                 self.path = []
-                self.target_obj.hp = min(self.target_obj.max_hp, self.target_obj.hp + 2)
-                if self.target_obj.hp >= self.target_obj.max_hp:
-                    self.finish_current_task(game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                self.harvest_timer += 1
+                if self.harvest_timer > 30:
+                    if res_dict['wood'] > 0:
+                        res_dict['wood'] -= 1
+                        if random.random() > 0.5 and res_dict['stone'] > 0: res_dict['stone'] -= 1
+                        self.target_obj.hp = min(self.target_obj.max_hp, self.target_obj.hp + 10)
+                    self.harvest_timer = 0
             else: 
                 self._follow_path(buildings_list, is_obstacle_fn, get_speed_mod)
 
@@ -634,6 +658,11 @@ def resolve_collisions(unit_list, buildings_list, is_obstacle_fn):
             dx, dy = u2.x - u1.x, u2.y - u1.y
             dist_sq = dx*dx + dy*dy
             min_dist = u1.radius + u2.radius
+            
+            # Anti-Hugging dla zombiaków
+            if getattr(u1, 'title', '') == 'Zombie' and getattr(u2, 'title', '') == 'Zombie':
+                min_dist *= 1.5
+                
             if dist_sq < min_dist * min_dist:
                 dist = math.sqrt(dist_sq)
                 if dist == 0: dx, dy, dist = 1, 0, 1

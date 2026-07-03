@@ -1,15 +1,11 @@
 import pygame, math, random, json, os
 from config import *
 
-# 1. Najpierw inicjalizacja głównych modułów
 pygame.init()
 
-# 2. Utworzenie okna gry (Display Surface) - WYMAGANE przed convert_alpha()
-WIDTH, HEIGHT = 1024, 768
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("RTS - Prawdziwa Mgła Wojny, Nowe Wieżyczki i UI SC2")
 
-# 3. DOPIERO TERAZ wczytywanie zasobów graficznych do pamięci globalnej
 LOADED_IMAGES = {}
 for key, path in IMAGE_PATHS.items():
     if path and path.strip() != "" and os.path.exists(path):
@@ -24,20 +20,13 @@ for key, path in IMAGE_PATHS.items():
                 img = pygame.transform.scale(img, (st['w_tiles']*TILE_SIZE, st['h_tiles']*TILE_SIZE))
             elif key in ['wood', 'crystal', 'stone']:
                 img = pygame.transform.scale(img, (40, 40))
+            elif key.startswith('bg_'):
+                img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
             LOADED_IMAGES[key] = img
         except Exception as e:
             print(f"Błąd ładowania grafiki {path}: {e}")
 
 from entities import *
-
-font_main = pygame.font.SysFont(None, 24)
-font_small = pygame.font.SysFont(None, 18)
-font_bold = pygame.font.SysFont(None, 24, bold=True)
-font_info_title = pygame.font.SysFont(None, 28, bold=True)
-font_title = pygame.font.SysFont(None, 64, bold=True)
-
-# ... tutaj zaczyna się dalsza część oryginalnego kodu pliku main.py ...
-# global_message, global_message_timer = "", 0
 
 font_main = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 18)
@@ -279,30 +268,33 @@ while True:
         elif selected_workers > 0:
             bst = BUILDING_STATS
             if worker_menu_state == 'MAIN':
-                active_buttons.append({'id': 'MENU_BASIC', 'label': 'Budowle Podst.', 'w': 0, 'c': 0, 's': 0, 'hotkey': '1', 'col': 0, 'row': 0})
-                active_buttons.append({'id': 'MENU_ADV', 'label': 'Budowle Zaaw.', 'w': 0, 'c': 0, 's': 0, 'hotkey': '2', 'col': 1, 'row': 0})
-                active_buttons.append({'id': 'CMD_REPAIR', 'label': 'Napraw', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'N', 'col': 2, 'row': 0})
+                active_buttons.append({'id': 'MENU_BASIC', 'label': 'Rozwój', 'w': 0, 'c': 0, 's': 0, 'hotkey': '1', 'col': 0, 'row': 0})
+                active_buttons.append({'id': 'MENU_DEF', 'label': 'Obrona', 'w': 0, 'c': 0, 's': 0, 'hotkey': '2', 'col': 1, 'row': 0})
+                active_buttons.append({'id': 'MENU_VIS', 'label': 'Wizja', 'w': 0, 'c': 0, 's': 0, 'hotkey': '3', 'col': 2, 'row': 0})
+                active_buttons.append({'id': 'CMD_REPAIR', 'label': 'Napraw', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'N', 'col': 0, 'row': 1})
             elif worker_menu_state == 'BASIC':
                 active_buttons.append({'id': 'B_BASE', 'label': 'Baza', 'w': bst['base']['cost_w'], 'c': bst['base']['cost_c'], 's': bst['base'].get('cost_s',0), 'hotkey': 'Q', 'col': 0, 'row': 0})
                 active_buttons.append({'id': 'B_HOUSE', 'label': 'Magazyn', 'w': bst['house']['cost_w'], 'c': bst['house']['cost_c'], 's': bst['house'].get('cost_s',0), 'hotkey': 'H', 'col': 1, 'row': 0})
-                active_buttons.append({'id': 'B_WOODWALL', 'label': 'Drev. Mur', 'w': bst['wood_wall']['cost_w'], 'c': bst['wood_wall']['cost_c'], 's': bst['wood_wall'].get('cost_s',0), 'hotkey': 'W', 'col': 2, 'row': 0})
-                active_buttons.append({'id': 'B_STONEWALL', 'label': 'Kam. Mur', 'w': bst['stone_wall']['cost_w'], 'c': bst['stone_wall']['cost_c'], 's': bst['stone_wall'].get('cost_s',0), 'hotkey': 'S', 'col': 3, 'row': 0})
-                active_buttons.append({'id': 'B_TOWER', 'label': 'Wieżyczka', 'w': bst['tower']['cost_w'], 'c': bst['tower']['cost_c'], 's': bst['tower'].get('cost_s',0), 'hotkey': 'T', 'col': 4, 'row': 0})
-                
-                active_buttons.append({'id': 'B_OBSTOWER', 'label': 'Wieża Obs.', 'w': bst['obs_tower']['cost_w'], 'c': bst['obs_tower']['cost_c'], 's': bst['obs_tower'].get('cost_s',0), 'hotkey': 'O', 'col': 0, 'row': 1})
-                active_buttons.append({'id': 'B_WORKSHOP', 'label': 'Warsztat', 'w': bst['workshop']['cost_w'], 'c': bst['workshop']['cost_c'], 's': bst['workshop'].get('cost_s',0), 'hotkey': 'K', 'col': 1, 'row': 1, 'disabled': not has_house})
-                active_buttons.append({'id': 'B_TORCH', 'label': 'Pochodnia', 'w': bst['torch']['cost_w'], 'c': bst['torch']['cost_c'], 's': bst['torch'].get('cost_s',0), 'hotkey': 'L', 'col': 2, 'row': 1})
-                active_buttons.append({'id': 'B_LARGETORCH', 'label': 'Duża Poch.', 'w': bst['large_torch']['cost_w'], 'c': bst['large_torch']['cost_c'], 's': bst['large_torch'].get('cost_s',0), 'hotkey': 'J', 'col': 3, 'row': 1})
-                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 4, 'row': 1})
-            elif worker_menu_state == 'ADV':
-                active_buttons.append({'id': 'B_BARRACKS', 'label': 'Baraki', 'w': bst['barracks']['cost_w'], 'c': bst['barracks']['cost_c'], 's': bst['barracks'].get('cost_s',0), 'hotkey': 'B', 'col': 0, 'row': 0, 'disabled': not has_workshop})
-                active_buttons.append({'id': 'B_DOUBLETOWER', 'label': 'Podwójne Dzi.', 'w': bst['double_tower']['cost_w'], 'c': bst['double_tower']['cost_c'], 's': bst['double_tower'].get('cost_s',0), 'hotkey': 'D', 'col': 1, 'row': 0, 'disabled': not has_workshop})
-                active_buttons.append({'id': 'B_ARTILLERY', 'label': 'Artyleria', 'w': bst['artillery']['cost_w'], 'c': bst['artillery']['cost_c'], 's': bst['artillery'].get('cost_s',0), 'hotkey': 'Y', 'col': 2, 'row': 0, 'disabled': not has_workshop})
-                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 3, 'row': 0})
-    
-        cmd_card_start_x, cmd_card_start_y = WIDTH - 650, BOTTOM_UI_Y + 15
+                active_buttons.append({'id': 'B_WORKSHOP', 'label': 'Warsztat', 'w': bst['workshop']['cost_w'], 'c': bst['workshop']['cost_c'], 's': bst['workshop'].get('cost_s',0), 'hotkey': 'K', 'col': 2, 'row': 0, 'disabled': not has_house})
+                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 0, 'row': 2})
+            elif worker_menu_state == 'DEF':
+                active_buttons.append({'id': 'B_WOODWALL', 'label': 'Drewno Mur', 'w': bst['wood_wall']['cost_w'], 'c': bst['wood_wall']['cost_c'], 's': bst['wood_wall'].get('cost_s',0), 'hotkey': 'W', 'col': 0, 'row': 0})
+                active_buttons.append({'id': 'B_STONEWALL', 'label': 'Głaz Mur', 'w': bst['stone_wall']['cost_w'], 'c': bst['stone_wall']['cost_c'], 's': bst['stone_wall'].get('cost_s',0), 'hotkey': 'S', 'col': 1, 'row': 0})
+                active_buttons.append({'id': 'B_TOWER', 'label': 'Wieżyczka', 'w': bst['tower']['cost_w'], 'c': bst['tower']['cost_c'], 's': bst['tower'].get('cost_s',0), 'hotkey': 'T', 'col': 2, 'row': 0})
+                active_buttons.append({'id': 'B_DOUBLETOWER', 'label': 'Działo', 'w': bst['double_tower']['cost_w'], 'c': bst['double_tower']['cost_c'], 's': bst['double_tower'].get('cost_s',0), 'hotkey': 'D', 'col': 0, 'row': 1, 'disabled': not has_workshop})
+                active_buttons.append({'id': 'B_ARTILLERY', 'label': 'Moździerz', 'w': bst['artillery']['cost_w'], 'c': bst['artillery']['cost_c'], 's': bst['artillery'].get('cost_s',0), 'hotkey': 'Y', 'col': 1, 'row': 1, 'disabled': not has_workshop})
+                active_buttons.append({'id': 'B_BARRACKS', 'label': 'Baraki', 'w': bst['barracks']['cost_w'], 'c': bst['barracks']['cost_c'], 's': bst['barracks'].get('cost_s',0), 'hotkey': 'B', 'col': 2, 'row': 1, 'disabled': not has_workshop})
+                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 0, 'row': 2})
+            elif worker_menu_state == 'VIS':
+                active_buttons.append({'id': 'B_TORCH', 'label': 'Pochodnia', 'w': bst['torch']['cost_w'], 'c': bst['torch']['cost_c'], 's': bst['torch'].get('cost_s',0), 'hotkey': 'L', 'col': 0, 'row': 0})
+                active_buttons.append({'id': 'B_LARGETORCH', 'label': 'Duża Poch.', 'w': bst['large_torch']['cost_w'], 'c': bst['large_torch']['cost_c'], 's': bst['large_torch'].get('cost_s',0), 'hotkey': 'J', 'col': 1, 'row': 0})
+                active_buttons.append({'id': 'B_OBSTOWER', 'label': 'Wieża Obs.', 'w': bst['obs_tower']['cost_w'], 'c': bst['obs_tower']['cost_c'], 's': bst['obs_tower'].get('cost_s',0), 'hotkey': 'O', 'col': 2, 'row': 0})
+                active_buttons.append({'id': 'MENU_BACK', 'label': 'Wróć', 'w': 0, 'c': 0, 's': 0, 'hotkey': 'Esc', 'col': 0, 'row': 2})
+
+        cmd_card_start_x = WIDTH - 280
+        cmd_card_start_y = BOTTOM_UI_Y + 10
         for btn in active_buttons:
-            btn['rect'] = pygame.Rect(cmd_card_start_x + (btn['col'] * 105), cmd_card_start_y + (btn['row'] * 60), 95, 50)
+            btn['rect'] = pygame.Rect(cmd_card_start_x + (btn['col'] * 85), cmd_card_start_y + (btn['row'] * 48), 80, 44)
     
         mods = pygame.key.get_mods()
         shift_pressed_global = bool(mods & pygame.KMOD_SHIFT)
@@ -341,12 +333,12 @@ while True:
                     is_paused = True
                 elif event.key == pygame.K_ESCAPE:
                     if pending_command: pending_command = None
-                    elif worker_menu_state in ['BASIC', 'ADV']: worker_menu_state = 'MAIN'
+                    elif worker_menu_state in ['BASIC', 'DEF', 'VIS']: worker_menu_state = 'MAIN'
                     elif any(o.is_selected for o in units + buildings + trees + crystals + stones + zombies):
                         for o in units + buildings + trees + crystals + stones + zombies: o.is_selected = False
                     else:
                         is_paused = True
-                elif event.key == pygame.K_s and pending_command is None and worker_menu_state == 'MAIN':
+                elif event.key == pygame.K_s and pending_command is None:
                     for u in units:
                         if u.is_selected: u.command_stop()
                 elif event.key == pygame.K_m: pending_command = 'MOVE'
@@ -373,22 +365,24 @@ while True:
                     if event.key == pygame.K_n: pending_command = 'REPAIR'
                     elif worker_menu_state == 'MAIN':
                         if event.key == pygame.K_1: worker_menu_state = 'BASIC'
-                        elif event.key == pygame.K_2: worker_menu_state = 'ADV'
+                        elif event.key == pygame.K_2: worker_menu_state = 'DEF'
+                        elif event.key == pygame.K_3: worker_menu_state = 'VIS'
                     elif worker_menu_state == 'BASIC':
-                        if event.key == pygame.K_h: pending_command = 'BUILD_house'
-                        elif event.key == pygame.K_w: pending_command = 'BUILD_wood_wall'
-                        elif event.key == pygame.K_s: pending_command = 'BUILD_stone_wall'
-                        elif event.key == pygame.K_q: pending_command = 'BUILD_base'
-                        elif event.key == pygame.K_t: pending_command = 'BUILD_tower'
-                        elif event.key == pygame.K_o: pending_command = 'BUILD_obs_tower'
-                        elif event.key == pygame.K_l: pending_command = 'BUILD_torch'
-                        elif event.key == pygame.K_j: pending_command = 'BUILD_large_torch'
+                        if event.key == pygame.K_q: pending_command = 'BUILD_base'
+                        elif event.key == pygame.K_h: pending_command = 'BUILD_house'
                         elif event.key == pygame.K_k:
                             if has_house: pending_command = 'BUILD_workshop'
-                    elif worker_menu_state == 'ADV':
-                        if event.key == pygame.K_b and has_workshop: pending_command = 'BUILD_barracks'
+                    elif worker_menu_state == 'DEF':
+                        if event.key == pygame.K_w: pending_command = 'BUILD_wood_wall'
+                        elif event.key == pygame.K_s: pending_command = 'BUILD_stone_wall'
+                        elif event.key == pygame.K_t: pending_command = 'BUILD_tower'
                         elif event.key == pygame.K_d and has_workshop: pending_command = 'BUILD_double_tower'
                         elif event.key == pygame.K_y and has_workshop: pending_command = 'BUILD_artillery'
+                        elif event.key == pygame.K_b and has_workshop: pending_command = 'BUILD_barracks'
+                    elif worker_menu_state == 'VIS':
+                        if event.key == pygame.K_o: pending_command = 'BUILD_obs_tower'
+                        elif event.key == pygame.K_l: pending_command = 'BUILD_torch'
+                        elif event.key == pygame.K_j: pending_command = 'BUILD_large_torch'
                     
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if is_paused:
@@ -410,7 +404,8 @@ while True:
                                 clicked_ui = True
                                 if btn.get('disabled'): show_message("Wymagania niespełnione!")
                                 elif btn['id'] == 'MENU_BASIC': worker_menu_state = 'BASIC'
-                                elif btn['id'] == 'MENU_ADV': worker_menu_state = 'ADV'
+                                elif btn['id'] == 'MENU_DEF': worker_menu_state = 'DEF'
+                                elif btn['id'] == 'MENU_VIS': worker_menu_state = 'VIS'
                                 elif btn['id'] == 'MENU_BACK': worker_menu_state = 'MAIN'
                                 elif btn['id'] == 'CMD_REPAIR': pending_command = 'REPAIR'
                                 elif btn['id'] == 'R_WORKER' and selected_bases:
@@ -514,7 +509,9 @@ while True:
                     if TOP_BAR_HEIGHT <= mouse_y < BOTTOM_UI_Y:
                         shift_pressed = shift_pressed_global
                         
-                        pending_command = None
+                        if pending_command and pending_command.startswith('BUILD_'):
+                            pending_command = None
+                            
                         if selected_bases: selected_bases[0].rally_x, selected_bases[0].rally_y = world_mouse_x, world_mouse_y
                         elif selected_barracks: selected_barracks[0].rally_x, selected_barracks[0].rally_y = world_mouse_x, world_mouse_y
                         else:
@@ -664,14 +661,56 @@ while True:
             for col in range(max(0, start_col), min(MAP_COLS, end_col)):
                 val = game_map[row][col]
                 rect = ((col * TILE_SIZE) - camera_x, (row * TILE_SIZE) - camera_y, TILE_SIZE, TILE_SIZE)
-                if val == 1: pygame.draw.rect(world_surface, ROCK_COLOR, rect)
-                elif val == 5: pygame.draw.rect(world_surface, WATER_COLOR, rect)
-                elif val == 6: pygame.draw.rect(world_surface, DIRT_COLOR, rect)
+                
+                if 'bg_grass' in LOADED_IMAGES:
+                    world_surface.blit(LOADED_IMAGES['bg_grass'], rect[:2])
+                else:
+                    pygame.draw.rect(world_surface, GRASS_COLOR, rect)
+                    
+                if val == 6: 
+                    if 'bg_dirt' in LOADED_IMAGES:
+                        top = row > 0 and game_map[row-1][col] == 0
+                        bottom = row < MAP_ROWS-1 and game_map[row+1][col] == 0
+                        left = col > 0 and game_map[row][col-1] == 0
+                        right = col < MAP_COLS-1 and game_map[row][col+1] == 0
+                        tl = row > 0 and col > 0 and game_map[row-1][col-1] == 0
+                        tr = row > 0 and col < MAP_COLS-1 and game_map[row-1][col+1] == 0
+                        bl = row < MAP_ROWS-1 and col > 0 and game_map[row+1][col-1] == 0
+                        br = row < MAP_ROWS-1 and col < MAP_COLS-1 and game_map[row+1][col+1] == 0
+
+                        img = LOADED_IMAGES['bg_dirt']
+                        if top and left and 'bg_dirt_tl' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_tl']
+                        elif top and right and 'bg_dirt_tr' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_tr']
+                        elif bottom and left and 'bg_dirt_bl' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_bl']
+                        elif bottom and right and 'bg_dirt_br' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_br']
+                        elif top and 'bg_dirt_t' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_t']
+                        elif bottom and 'bg_dirt_b' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_b']
+                        elif left and 'bg_dirt_l' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_l']
+                        elif right and 'bg_dirt_r' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_r']
+                        elif tl and 'bg_dirt_tl' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_tl']
+                        elif tr and 'bg_dirt_tr' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_tr']
+                        elif bl and 'bg_dirt_bl' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_bl']
+                        elif br and 'bg_dirt_br' in LOADED_IMAGES: img = LOADED_IMAGES['bg_dirt_br']
+                        
+                        world_surface.blit(img, rect[:2])
+                    else:
+                        pygame.draw.rect(world_surface, DIRT_COLOR, rect)
+                        
+                elif val == 1:
+                    if 'bg_rock' in LOADED_IMAGES: world_surface.blit(LOADED_IMAGES['bg_rock'], rect[:2])
+                    else: pygame.draw.rect(world_surface, ROCK_COLOR, rect)
+                elif val == 5:
+                    if 'bg_water' in LOADED_IMAGES: world_surface.blit(LOADED_IMAGES['bg_water'], rect[:2])
+                    else: pygame.draw.rect(world_surface, WATER_COLOR, rect)
     
         for d in decorations:
             if camera_x - 50 < d['x'] < camera_x + v_width + 50 and camera_y - 50 < d['y'] < camera_y + v_height + 50:
                 if explored_map[int(d['y']//TILE_SIZE)][int(d['x']//TILE_SIZE)]:
                     cx_d, cy_d = int(d['x'] - camera_x), int(d['y'] - camera_y)
+                    
+                    if d['type'] in ['grass', 'bush', 'flower']:
+                        cx_d += int(math.sin(global_time * 0.05 + d['x']) * 3)
+                        
                     if d['type'] == 'bush': pygame.draw.circle(world_surface, (30, 90, 30), (cx_d, cy_d), 6)
                     elif d['type'] == 'pebble': pygame.draw.circle(world_surface, (120, 120, 120), (cx_d, cy_d), 3)
                     elif d['type'] == 'flower': pygame.draw.circle(world_surface, (200, 50, 50), (cx_d, cy_d), 2)
@@ -771,21 +810,27 @@ while True:
             night_overlay.fill((0, 0, 15, night_alpha))
             
             for b in buildings:
-                if b.is_built and b.b_type in ['torch', 'large_torch'] and is_in_vision_check(b.rect.centerx, b.rect.centery):
-                    glow_rad = 150 if b.b_type == 'torch' else 250
-                    hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
-                    
-                    steps = 4
-                    for step in range(steps, 0, -1):
-                        r = int(glow_rad * (step / steps))
-                        a = int(night_alpha / steps)
-                        pygame.draw.circle(hole_surf, (0, 0, 0, a), (glow_rad, glow_rad), r)
-                    
-                    night_overlay.blit(hole_surf, (b.rect.centerx - camera_x - glow_rad, b.rect.centery - camera_y - glow_rad), special_flags=pygame.BLEND_RGBA_SUB)
-                    
+                if b.is_built and is_in_vision_check(b.rect.centerx, b.rect.centery):
+                    if b.b_type in ['torch', 'large_torch']:
+                        glow_rad = 180 if b.b_type == 'torch' else 320
+                        hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
+                        
+                        steps = 5
+                        for step in range(steps, 0, -1):
+                            r = int(glow_rad * (step / steps))
+                            a = int(night_alpha / steps)
+                            pygame.draw.circle(hole_surf, (0, 0, 0, a), (glow_rad, glow_rad), r)
+                        
+                        night_overlay.blit(hole_surf, (b.rect.centerx - camera_x - glow_rad, b.rect.centery - camera_y - glow_rad), special_flags=pygame.BLEND_RGBA_SUB)
+                    elif b.b_type != 'cemetery':
+                        glow_rad = max(b.rect.width, b.rect.height) + 30
+                        hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
+                        pygame.draw.circle(hole_surf, (0, 0, 0, night_alpha // 2), (glow_rad, glow_rad), glow_rad)
+                        night_overlay.blit(hole_surf, (b.rect.centerx - camera_x - glow_rad, b.rect.centery - camera_y - glow_rad), special_flags=pygame.BLEND_RGBA_SUB)
+                        
             for u in units:
                 if not u.is_hidden and u.u_type == 'worker':
-                    glow_rad = 80
+                    glow_rad = 100
                     hole_surf = pygame.Surface((glow_rad*2, glow_rad*2), pygame.SRCALPHA)
                     steps = 3
                     for step in range(steps, 0, -1):
@@ -829,66 +874,72 @@ while True:
         pygame.draw.line(screen, UI_BORDER, (180, BOTTOM_UI_Y), (180, HEIGHT), 2)
     
         info_x = 200
+        pygame.draw.rect(screen, BLACK, (info_x, BOTTOM_UI_Y + 15, 64, 64))
+        pygame.draw.rect(screen, UI_BORDER, (info_x, BOTTOM_UI_Y + 15, 64, 64), 2)
+        text_x = info_x + 80
+        
         if selected_bases:
             target = selected_bases[0]
-            screen.blit(font_info_title.render(target.title, True, WHITE), (info_x, BOTTOM_UI_Y + 15))
-            screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (info_x, BOTTOM_UI_Y + 45))
+            screen.blit(font_info_title.render(target.title, True, WHITE), (text_x, BOTTOM_UI_Y + 15))
+            screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (text_x, BOTTOM_UI_Y + 45))
             if target.recruit_queue > 0:
-                screen.blit(font_main.render(f"Produkcja: Robotnik ({target.recruit_queue})", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
-                pygame.draw.rect(screen, DARK_GRAY, (info_x, BOTTOM_UI_Y + 95, 160, 12))
-                pygame.draw.rect(screen, GREEN, (info_x, BOTTOM_UI_Y + 95, int(160 * (target.recruit_progress / target.recruit_time_max)), 12))
+                screen.blit(font_main.render(f"Produkcja: Robotnik ({target.recruit_queue})", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
+                pygame.draw.rect(screen, DARK_GRAY, (text_x, BOTTOM_UI_Y + 95, 160, 12))
+                pygame.draw.rect(screen, GREEN, (text_x, BOTTOM_UI_Y + 95, int(160 * (target.recruit_progress / target.recruit_time_max)), 12))
         elif selected_barracks:
             target = selected_barracks[0]
-            screen.blit(font_info_title.render(target.title, True, WHITE), (info_x, BOTTOM_UI_Y + 15))
-            screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (info_x, BOTTOM_UI_Y + 45))
+            screen.blit(font_info_title.render(target.title, True, WHITE), (text_x, BOTTOM_UI_Y + 15))
+            screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (text_x, BOTTOM_UI_Y + 45))
             if target.recruit_queue > 0:
-                screen.blit(font_main.render(f"Produkcja: Łucznik ({target.recruit_queue})", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
-                pygame.draw.rect(screen, DARK_GRAY, (info_x, BOTTOM_UI_Y + 95, 160, 12))
-                pygame.draw.rect(screen, GREEN, (info_x, BOTTOM_UI_Y + 95, int(160 * (target.recruit_progress / target.recruit_time_max)), 12))
+                screen.blit(font_main.render(f"Produkcja: Łucznik ({target.recruit_queue})", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
+                pygame.draw.rect(screen, DARK_GRAY, (text_x, BOTTOM_UI_Y + 95, 160, 12))
+                pygame.draw.rect(screen, GREEN, (text_x, BOTTOM_UI_Y + 95, int(160 * (target.recruit_progress / target.recruit_time_max)), 12))
         else:
             selected_buildings = [b for b in buildings if b.is_selected]
             selected_zombies = [z for z in zombies if z.is_selected and is_in_vision_check(z.x, z.y)]
             if len(selected_buildings) > 0:
                 target = selected_buildings[0]
-                screen.blit(font_info_title.render(target.title, True, WHITE), (info_x, BOTTOM_UI_Y + 15))
-                screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (info_x, BOTTOM_UI_Y + 45))
+                screen.blit(font_info_title.render(target.title, True, WHITE), (text_x, BOTTOM_UI_Y + 15))
+                screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp}", True, RED), (text_x, BOTTOM_UI_Y + 45))
                 
                 if getattr(target, 'max_garrison', 0) > 0:
                     occ = len(target.garrisoned_units)
-                    screen.blit(font_main.render(f"Garnizon (Operatorzy): {occ}/{target.max_garrison}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
+                    screen.blit(font_main.render(f"Garnizon (Operatorzy): {occ}/{target.max_garrison}", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
                 else:
                     bonus = "+5 Populacji" if target.b_type == 'house' else ("Gniazdo potworów" if target.b_type == 'cemetery' else "Struktura gracza")
-                    screen.blit(font_main.render(bonus if target.is_built else "W budowie...", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
+                    screen.blit(font_main.render(bonus if target.is_built else "W budowie...", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
                     
             elif len(selected_zombies) > 0:
                 target = selected_zombies[0]
-                screen.blit(font_info_title.render(target.title, True, (255, 100, 100)), (info_x, BOTTOM_UI_Y + 15))
-                screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp} | Dmg: {target.damage}", True, RED), (info_x, BOTTOM_UI_Y + 45))
+                screen.blit(font_info_title.render(target.title, True, (255, 100, 100)), (text_x, BOTTOM_UI_Y + 15))
+                screen.blit(font_small.render(f"HP: {target.hp} / {target.max_hp} | Dmg: {target.damage}", True, RED), (text_x, BOTTOM_UI_Y + 45))
             else:
                 selected_crystals = [c for c in crystals if c.is_selected]
                 selected_stones = [s for s in stones if s.is_selected]
                 selected_trees = [t for t in trees if t.is_selected]
                 if len(selected_crystals) > 0:
                     target = selected_crystals[0]
-                    screen.blit(font_info_title.render(target.title, True, CYAN), (info_x, BOTTOM_UI_Y + 15))
-                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (info_x, BOTTOM_UI_Y + 45))
-                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
+                    screen.blit(font_info_title.render(target.title, True, CYAN), (text_x, BOTTOM_UI_Y + 15))
+                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (text_x, BOTTOM_UI_Y + 45))
+                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
                 elif len(selected_stones) > 0:
                     target = selected_stones[0]
-                    screen.blit(font_info_title.render(target.title, True, (150, 150, 150)), (info_x, BOTTOM_UI_Y + 15))
-                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (info_x, BOTTOM_UI_Y + 45))
-                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
+                    screen.blit(font_info_title.render(target.title, True, (150, 150, 150)), (text_x, BOTTOM_UI_Y + 15))
+                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (text_x, BOTTOM_UI_Y + 45))
+                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
                 elif len(selected_trees) > 0:
                     target = selected_trees[0]
-                    screen.blit(font_info_title.render(target.title, True, GREEN), (info_x, BOTTOM_UI_Y + 15))
-                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (info_x, BOTTOM_UI_Y + 45))
-                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (info_x, BOTTOM_UI_Y + 70))
+                    screen.blit(font_info_title.render(target.title, True, GREEN), (text_x, BOTTOM_UI_Y + 15))
+                    screen.blit(font_main.render(f"Zasoby: {target.amount} / {target.max_amount}", True, WHITE), (text_x, BOTTOM_UI_Y + 45))
+                    screen.blit(font_small.render(f"Zajęte miejsca: {sum(1 for u in units if getattr(u, 'target_obj', None) == target and u.state in ['MOVE', 'HARVEST', 'SEARCH_MOVE'])} / {target.max_workers}", True, LIGHT_GRAY), (text_x, BOTTOM_UI_Y + 70))
                 elif len([u for u in units if u.is_selected and not u.is_hidden]) > 0:
                     count = len([u for u in units if u.is_selected and not u.is_hidden])
-                    screen.blit(font_info_title.render(f"Zaznaczone jednostki ({count})", True, WHITE), (info_x, BOTTOM_UI_Y + 15))
+                    screen.blit(font_info_title.render(f"Zaznaczone jednostki ({count})", True, WHITE), (text_x, BOTTOM_UI_Y + 15))
                     su = next((u for u in units if u.is_selected and not u.is_hidden), None)
-                    if su: screen.blit(font_small.render(f"HP: {su.hp}/{su.max_hp} | Atak DMG: {su.damage}", True, RED), (info_x, BOTTOM_UI_Y + 45))
+                    if su: screen.blit(font_small.render(f"HP: {su.hp}/{su.max_hp} | Atak DMG: {su.damage}", True, RED), (text_x, BOTTOM_UI_Y + 45))
     
+        cmd_card_start_x = WIDTH - 290
+        cmd_card_start_y = BOTTOM_UI_Y + 10
         pygame.draw.line(screen, UI_BORDER, (cmd_card_start_x - 20, BOTTOM_UI_Y), (cmd_card_start_x - 20, HEIGHT), 2)
         pygame.draw.rect(screen, (20, 25, 30), (cmd_card_start_x - 20, BOTTOM_UI_Y, WIDTH, UI_HEIGHT)) 
     

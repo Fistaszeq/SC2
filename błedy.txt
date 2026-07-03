@@ -1,13 +1,54 @@
 
 
-? W fullscreen zablokować kursor.
 
-? Limi zombie.
-? Stakowanie się zmobie które się nie zrespiły.
-- Interfejs do prawej strony mocno a na środku staty.
-- Budynki podzielone jako obrona rozwój wizja itd.
-- GRAFIKI.
 
-+ Jakaś altyleria moździesz.
+!- Tryp zbierania
+|- Tryb wracania do bazy itd.
+-
+
+? Dziekie zwierzęta oraz food?
+
+? Więcej dział i może jakiś rozwój i spowolnienie gry.
+
+
+? Trawa do góry oraz pokazania wiatru poprzez pochyły trawy. # Dekoracja
+
+Budowla to B klawisz 
+- W Budowlach jest S które jest Storage 
+- 
+
+
+
 
 Błędy:
+
+
+
+- Zombie lubią się przytulać coś.
+
+- Jeśli robotnik nie ma nic do roboty to szuka najbliższego surowca, albo zwiększć range zainteresowania. Chyba że specjalnie go wywlekliśmy.
+-+ Oraz sam chce naprawiać.
+
+- Możliwość zarządzania jednostką kiedy buduje.
+-+ Kliknięcie prawym podczas kiedy mamy zaznaczony tryb dudowania nie daje komendy do transportu.
+
+- Jednostki nie mogą iść poza mapę ale można zaznaczyć aby szły i wtedy wywala out of range
+{
+      File "C:\Users\funfe\SC2\main.py", line 541, in <module>
+    u.issue_command(('MOVE', world_mouse_x, world_mouse_y), shift_pressed, game_map, MAP_COLS, MAP_ROWS, buildings)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\funfe\SC2\entities.py", line 357, in issue_command
+    self._execute_cmd(cmd_tuple, game_map, MAP_COLS, MAP_ROWS, buildings_list)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\funfe\SC2\entities.py", line 369, in _execute_cmd
+    self.calculate_path(cmd_tuple[1], cmd_tuple[2], game_map, MAP_COLS, MAP_ROWS, buildings_list)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\funfe\SC2\entities.py", line 351, in calculate_path
+    self.path = get_astar_path((self.x//TILE_SIZE, self.y//TILE_SIZE), (tx//TILE_SIZE, ty//TILE_SIZE), game_map, MAP_COLS, MAP_ROWS, buildings_list)
+                ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\funfe\SC2\pathfinding.py", line 22, in get_astar_path
+    if blocked_grid[goal[1]][goal[0]]:
+       ~~~~~~~~~~~~^^^^^^^^^
+IndexError: list index out of range
+
+}
