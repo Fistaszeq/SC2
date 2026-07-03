@@ -1,24 +1,14 @@
 
 
+? W fullscreen zablokować kursor.
 
+? Limi zombie.
+? Stakowanie się zmobie które się nie zrespiły.
+- Interfejs do prawej strony mocno a na środku staty.
+- Budynki podzielone jako obrona rozwój wizja itd.
+- GRAFIKI.
 
-!- Tryp zbierania
-|- Tryb wracania do bazy itd.
--
-
-? Dziekie zwierzęta oraz food?
-
-? Więcej dział i może jakiś rozwój i spowolnienie gry.
-
-
-? Trawa do góry oraz pokazania wiatru poprzez pochyły trawy. # Dekoracja
-
-Budowla to B klawisz 
-- W Budowlach jest S które jest Storage 
-- 
-
-
-
++ Jakaś altyleria moździesz.
 
 Błędy:
 
