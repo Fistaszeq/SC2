@@ -9,14 +9,14 @@
 - GRAFIKI.
 
 + Jakaś altyleria moździesz.
-
++ Możliwe zaznaczenie obiektu, surowca aby robotnicy pobierali odarazu bo nie ma tak teraz.
++ Możliwe zaznaczenie i wywołanie jednostaki gdy buduje.
 Błędy:
 
 
 
 - Zombie lubią się przytulać coś.
 
-- Jeśli robotnik nie ma nic do roboty to szuka najbliższego surowca, albo zwiększć range zainteresowania. Chyba że specjalnie go wywlekliśmy.
 -+ Oraz sam chce naprawiać.
 
 - Możliwość zarządzania jednostką kiedy buduje.
@@ -42,3 +42,10 @@ Błędy:
 IndexError: list index out of range
 
 }
+
+
+
+Serio Błędy:
+1. Zombie czasami zatrzymują się opierając się na siebie.
+2. Problemy z optymalizacją, nie jakieś straszne ale super nie jest.
+3. Budowle robią się z -1hp.
